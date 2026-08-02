@@ -1,0 +1,209 @@
+
+# brew install node
+
+# sudo apt install nodejs
+# sudo apt install npm
+# install xclip linux
+
+# npm
+# nodejs
+# wheel
+# pillow
+# torch
+
+# aiodns
+# aiohttp
+# aiosignal
+# asgiref
+# attrs
+# beautifulsoup4
+# Brotli
+# bs4
+# certifi
+# cffi
+# charset-normalizer
+# cryptography
+# docutils
+# ecdsa
+# ECPy
+# frozenlist
+# idna
+# Js2Py
+# Kivy
+# Kivy-Garden
+# kivymd
+# miniupnpc
+# mnemonic
+# multidict
+# pillow
+# pminit
+# pycares
+# pycparser
+# Pygments
+# pyjsparser
+# pythonmonkey
+# pytz
+# PyYAML
+# requests
+# six
+# soupsieve
+# sqlparse
+# tzlocal
+# urllib3
+# yarl
+
+
+
+
+
+
+
+wheel
+pillow
+aiodns==3.1.1
+aiohttp
+aiosignal==1.3.1
+asgiref==3.7.2
+attrs==23.2.0
+pybase62
+beautifulsoup4==4.12.3
+Brotli==1.1.0
+bs4==0.0.2
+charset-normalizer==3.3.2
+cryptography==42.0.5
+python-dateutil
+dilithium-py==1.4.0
+distro
+django-rq==3.0.0
+docutils==0.20.1
+ecdsa==0.18.0
+ECPy==1.2.5
+frozenlist==1.4.1
+idna==3.6
+Kivy-Garden==0.1.5
+kivymd==1.2.0
+miniupnpc
+mnemonic==0.21
+multidict==6.0.5
+paramiko
+psutil
+pybase62
+pycares
+pycparser==2.21
+Pygments==2.17.2
+pytz==2024.1
+PyYAML==6.0.1
+requests==2.32.3
+rq==2.1.0
+six==1.16.0
+soupsieve==2.5
+speedtest-cli
+sqlparse==0.4.4
+stem
+tzlocal==5.2
+urllib3==2.2.0
+xxhash==3.5.0
+yarl==1.9.4
+
+
+
+# # worked on deb
+# pyinstaller --name SoNode --onefile start.py \
+# pyinstaller --name SoNode --onefile --windowed --icon=sologo.png start.py \
+# --hidden-import=requests \
+# --hidden-import=pytz \
+# --hidden-import=uuid \
+# --hidden-import=getpass \
+# --hidden-import=cryptography \
+# --hidden-import=cryptography.fernet \
+# --hidden-import=cryptography.hazmat \
+# --hidden-import=cryptography.hazmat.primitives.kdf.scrypt \
+# --hidden-import=cryptography.hazmat.primitives.asymmetric \
+# --hidden-import=pty \
+# --hidden-import=json \
+# --hidden-import=yaml \
+# --hidden-import=psutil \
+# --hidden-import=xxhash \
+# --hidden-import=urllib3 \
+# --hidden-import=pillow \
+# --hidden-import=mnemonic \
+# --hidden-import=bs4 \
+# --hidden-import=pybase62 \
+# --hidden-import=distro \
+# --hidden-import=aiohttp \
+# --hidden-import=ecdsa \
+# --hidden-import=base62 \
+# --hidden-import=paramiko \
+# --hidden-import=stem \
+# --hidden-import=stem.control \
+# --hidden-import=stem.process 
+
+#  --collect-all kivy
+
+
+# pyinstaller --name SoNode --onefile start.py
+# or 
+# python -m PyInstaller myApp.spec
+
+# nano myApp.spec
+
+# exe = EXE(
+#     ...
+#     icon='assets/icon.png',
+# )
+
+# python -m PyInstaller myApp.spec
+
+
+# # worked on mac (one dir)
+# pyinstaller start.py \
+# --name SoNode \
+# --onedir \
+# --windowed \
+# --icon SoNode.icns \
+# --hidden-import=requests \
+# --hidden-import=pytz \
+# --hidden-import=cryptography.fernet \
+# --hidden-import=yaml \
+# --hidden-import=xxhash \
+# --hidden-import=urllib3 \
+# --hidden-import=pillow \
+# --hidden-import=mnemonic \
+# --hidden-import=bs4 \
+# --hidden-import=pybase62 \
+# --hidden-import=aiohttp \
+# --hidden-import=ecdsa \
+# --hidden-import=base62 \
+# --hidden-import=paramiko \
+# --hidden-import=pty \
+# --hidden-import=json \
+# --hidden-import=uuid \
+# --hidden-import=getpass
+
+
+# # worked on mac (onefile)
+# pyinstaller start.py \
+# --name SoNode \
+# --onefile \
+# --windowed \
+# --icon SoNode.icns \
+# --hidden-import=requests \
+# --hidden-import=pytz \
+# --hidden-import=cryptography.fernet \
+# --hidden-import=yaml \
+# --hidden-import=xxhash \
+# --hidden-import=urllib3 \
+# --hidden-import=pillow \
+# --hidden-import=mnemonic \
+# --hidden-import=bs4 \
+# --hidden-import=pybase62 \
+# --hidden-import=aiohttp \
+# --hidden-import=ecdsa \
+# --hidden-import=base62 \
+# --hidden-import=paramiko \
+# --hidden-import=pty \
+# --hidden-import=json \
+# --hidden-import=uuid \
+# --hidden-import=getpass
+
+
