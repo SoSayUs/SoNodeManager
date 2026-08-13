@@ -40,9 +40,17 @@ psql_path = '/opt/homebrew/bin/psql'
 
 
 def hardware_check(output=None):
+    get_variables()
+    global node_data
+    global operatorData
+    global node_id
     from commands.utils import run_hardware_test
-    if not run_hardware_test(output=output):
+    result, node_data = run_hardware_test(output=output, node_data=node_data, operatorData=operatorData)
+    if not result:
         raise Exception('Failed hardware check')
+    else:
+        operatorData['myNodes'][node_id] = node_data
+        write_operatorData(operatorData)
 
 def get_variables(remote_cmd=False):
     global operatorData

@@ -76,7 +76,7 @@ def super_id(iden=None, net=None, operatorData=None, create=None):
                 net_iden = sonet.id
                 net_created_dt = sonet.created
             if net_iden == 'ohSohVQmm16CNAIPGbrrix8':
-                _super_id = 'usrSo1KOSJaVhV6foQbf9NV1tx'
+                _super_id = 'usrSo1KOSJaVhV6foQ'
                 print('_super_id1',_super_id)
             elif net_created_dt:
                 print('sonet.created',net_created_dt)

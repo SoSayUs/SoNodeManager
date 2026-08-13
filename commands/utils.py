@@ -226,7 +226,7 @@ def value_is_none(value):
             return True
     return False
 
-def hash_upk_id(pubKey, length=20):
+def hash_upk_id(pubKey, length=14):
     from commands.locked import generate_id
     return 'upkSo' + generate_id(pubKey, length=length) 
 
@@ -1034,14 +1034,16 @@ def declare_self_active(activate, output=None, operatorData=None, wait_for_reloa
                                 system = platform.system()
                                 try:
                                     if system == "Linux":
-                                        full_nodeData['nodeData']['hardware']['os'] = 'Linux'
+                                        full_nodeData['nodeData']['hardware_data']['os'] = 'Linux'
                                     elif system == "Darwin":
-                                        full_nodeData['nodeData']['hardware']['os'] = 'MacOS'
+                                        full_nodeData['nodeData']['hardware_data']['os'] = 'MacOS'
                                     elif system == "Windows":
-                                        full_nodeData['nodeData']['hardware']['os'] = 'Windows'
+                                        full_nodeData['nodeData']['hardware_data']['os'] = 'Windows'
                                     if 'os' not in full_nodeData['meta']:
-                                        full_nodeData['meta']['os'] = full_nodeData['nodeData']['hardware']['os']
+                                        full_nodeData['meta']['os'] = full_nodeData['nodeData']['hardware_data']['os']
                                         operatorData['myNodes'][full_nodeData['nodeData']['id']] = full_nodeData
+
+                                        full_nodeData['nodeData']['hardware_data']['results'] = full_nodeData['meta']['hardware_results']
                                 except:
                                     pass
 
@@ -2183,7 +2185,7 @@ def get_commands(task, system=None, operatorData=None, in_full=False, extras={})
             import commands.linux.linux_purgedb as cmds
         elif task == 'restart':
             cmds = [
-                ["raise_if_error", "sudo", "-S", f"{homepath}/Sonet/.data/env/bin/python3", f"{homepath}/Sonet/SoNodeServer/manage.py", "check"],
+                # ["raise_if_error", "sudo", "-S", f"{homepath}/Sonet/.data/env/bin/python3", f"{homepath}/Sonet/SoNodeServer/manage.py", "check"],
                 ["sudo", "-S", "supervisorctl", "reload"],
                 ["sudo", "-S", "systemctl", "daemon-reexec"],
                 ["sudo", "-S", "systemctl", "daemon-reload"],
@@ -2591,6 +2593,24 @@ def adjust_settings(nodeData=None, node_data=None, clear_data=False, output=None
     f.close
 
     operatorData = get_operatorData(operatorData)
+    if 'sonet' in operatorData:
+        sonet_data = operatorData['sonet']
+
+        # import json
+        from pathlib import Path
+        filename = Path.home() / "Sonet" / "SoNodeServer" / "static_cdn" / "manifest.json"
+
+        with filename.open("r", encoding="utf-8") as f:
+            manifest_dict = json.load(f)
+
+        manifest_dict['name'] = sonet_data['Title']
+        manifest_dict['short_name'] = sonet_data['Title']
+
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump(manifest_dict, f, indent=4)
+
+
+
     nodes = get_node_list(operatorData=operatorData, exclude_self=False)
     conf_path = homepath + "/Sonet/.data/special/cors.conf"
     if os.path.exists(conf_path):
@@ -3583,11 +3603,11 @@ def get_encrypted_secret(var=None, var_name=None):
 def gb(bytes_val: int) -> float:
     return bytes_val / (1024 ** 3)
 
-def check(label: str, passed: bool, detail: str, output=None) -> bool:
+def check(label: str, passed: bool, detail: str, spec=True, output=None) -> bool:
     status = "PASS" if passed else "FAIL"
     print(f"  {status}  {label:<22} {detail}")
     update_output(f"  {status}  {label:<22} {detail}", output)
-    return passed
+    return str(spec) if passed else False
 
 def check_bitness(output=None) -> bool:
     bits = struct.calcsize("P") * 8
@@ -3600,6 +3620,7 @@ def check_cpu_cores(min_logical_cores: int, output=None) -> bool:
         "CPU logical cores",
         logical >= min_logical_cores,
         f"{logical} logical ({physical} physical), need ≥ {min_logical_cores}",
+        spec=f"{logical} logical ({physical} physical)",
         output=output
     )
 
@@ -3613,12 +3634,13 @@ def check_cpu_freq(min_freq_ghz: float, output=None) -> bool:
         "CPU frequency",
         reported_ghz >= min_freq_ghz,
         f"{reported_ghz:.2f} GHz, need ≥ {min_freq_ghz} GHz",
+        spec=f"{reported_ghz:.2f}",
         output=output
     )
 
 def check_ram(min_ram_gb: int, output=None) -> bool:
     total_gb = gb(psutil.virtual_memory().total)
-    return check("RAM", total_gb >= min_ram_gb, f"{total_gb:.1f} GB, need ≥ {min_ram_gb} GB", output=output)
+    return check("RAM", total_gb >= min_ram_gb, f"{total_gb:.1f} GB, need ≥ {min_ram_gb} GB", spec=f"{total_gb:.1f}", output=output)
 
 def check_disk(min_disk_gb: int, output=None) -> bool:
     root = "C:\\" if platform.system() == "Windows" else "/"
@@ -3629,6 +3651,7 @@ def check_disk(min_disk_gb: int, output=None) -> bool:
             "Primary disk",
             total_gb >= min_disk_gb,
             f"{total_gb:.0f} GB total, need ≥ {min_disk_gb} GB",
+            spec=f"{total_gb:.0f}",
             output=output
         )
     except PermissionError:
@@ -3648,6 +3671,7 @@ def check_os(min_linux_kernel: tuple, min_macos_minor: int, min_windows_major: i
             "OS version",
             passed,
             f"macOS {mac_ver}, need 10.{min_macos_minor}+ (High Sierra) or later",
+            spec=mac_ver,
             output=output
         )
 
@@ -3658,7 +3682,7 @@ def check_os(min_linux_kernel: tuple, min_macos_minor: int, min_windows_major: i
         distro_like = distro.like().split()  # e.g. "debian ubuntu" -> ["debian", "ubuntu"]
         is_debian_based = distro_id == "debian" or "debian" in distro_like
         if not is_debian_based:
-            return check("OS version", False, f"distro is '{distro_id}', need Debian or a Debian-based distro", output=output)
+            return check("OS version", False, f"distro is '{distro_id}', need Debian or a Debian-based distro", spec=distro_id, output=output)
 
         kernel_str = platform.release().split("-")[0]
         try:
@@ -3720,6 +3744,7 @@ def check_cpu_benchmark(max_seconds: float, output=None) -> bool:
         "CPU benchmark",
         elapsed <= max_seconds,
         f"{elapsed:.2f}s for 400×400 matmul, need ≤ {max_seconds}s",
+        spec=f"{elapsed:.2f}s",
         output=output
     )
     
@@ -3763,7 +3788,7 @@ def check_internet_speed(min_download_mbps: float, min_upload_mbps: float, outpu
     )
     return download_mbps, upload_mbps
  
-def run_hardware_test(remote_cmd=None, output=None) -> bool:
+def run_hardware_test(remote_cmd=None, output=None, node_data=None, operatorData=None):
     """
     Checks whether the current machine meets the baseline specs of a
     late-2010s mid-range consumer device (circa 2017-2019).
@@ -3791,7 +3816,28 @@ def run_hardware_test(remote_cmd=None, output=None) -> bool:
     # edited for dev:
     MIN_UPLOAD_MBPS    = 2.0    # typical decent home upload
     MAX_BENCHMARK_SECS = 10.0    # 400x400 matmul; a decent 2017+ CPU does this in ~3-6s
- 
+
+    # operatorData = get_operatorData(operatorData)
+    # reqs = {'MIN_LOGICAL_CORES':4,'MIN_FREQ_GHZ':2.0,'MIN_RAM_GB':7.5,'MIN_DISK_GB':200,'MIN_WINDOWS_MAJOR':10,'MIN_MACOS_MINOR':13,'MIN_LINUX_KERNEL':(6, 00),'MIN_DOWNLOAD_MBPS':21.0,'MIN_UPLOAD_MBPS':2.0,'MAX_BENCHMARK_SECS':10.0,'MIN_DOWNLOAD_MBPS':5.0}
+    if 'new_sonet' in operatorData:
+        sonet = operatorData['new_sonet']
+    else:
+        sonet = operatorData['sonet']
+    reqs = sonet['node_requirements']
+
+    MIN_LOGICAL_CORES = reqs.get('MIN_LOGICAL_CORES',MIN_LOGICAL_CORES)
+    MIN_FREQ_GHZ = reqs.get('MIN_FREQ_GHZ',MIN_FREQ_GHZ)
+    MIN_RAM_GB = reqs.get('MIN_RAM_GB',MIN_RAM_GB)
+    MIN_DISK_GB = reqs.get('MIN_DISK_GB',MIN_DISK_GB)
+    MIN_WINDOWS_MAJOR = reqs.get('MIN_WINDOWS_MAJOR',MIN_WINDOWS_MAJOR)
+    MIN_MACOS_MINOR = reqs.get('MIN_MACOS_MINOR',MIN_MACOS_MINOR)
+    MIN_LINUX_KERNEL = tuple(reqs.get('MIN_LINUX_KERNEL',MIN_LINUX_KERNEL))
+    MIN_DOWNLOAD_MBPS = reqs.get('MIN_DOWNLOAD_MBPS',MIN_DOWNLOAD_MBPS)
+    MIN_UPLOAD_MBPS = reqs.get('MIN_UPLOAD_MBPS',MIN_UPLOAD_MBPS)
+    MAX_BENCHMARK_SECS = reqs.get('MAX_BENCHMARK_SECS',MAX_BENCHMARK_SECS)
+    MIN_DOWNLOAD_MBPS = reqs.get('MIN_DOWNLOAD_MBPS',MIN_DOWNLOAD_MBPS)
+
+    results = {'CPU': f"{platform.processor() or 'unknown'}"}
 
     update_output("\n\nHardware Check — Late 2010s Mid-Range Baseline\n", output)
     update_output(f"Machine : {platform.node()}", output)
@@ -3801,46 +3847,40 @@ def run_hardware_test(remote_cmd=None, output=None) -> bool:
 
     passed = True
 
-    if not check_bitness(output=output):
-    #     update_output("passed check_bitness", output)
-    # else:
-    #     update_output("failed check_bitness. required: 64-bit", output)
+    x = check_bitness(output=output)
+    if not x:
         passed = False
 
-    if not check_cpu_cores(MIN_LOGICAL_CORES, output=output):
-    #     update_output("passed check_cpu_cores", output)
-    # else:
-    #     update_output(f"failed check_cpu_cores. required: {MIN_LOGICAL_CORES}", output)
+    x = check_cpu_cores(MIN_LOGICAL_CORES, output=output)
+    if not x:
         passed = False
+    results['LOGICAL_CORES'] = x
 
-    if not check_cpu_freq(MIN_FREQ_GHZ, output=output):
-    #     update_output("passed check_cpu_freq", output)
-    # else:
-    #     update_output(f"failed check_cpu_freq. required: {MIN_FREQ_GHZ} GHz", output)
+    x = check_cpu_freq(MIN_FREQ_GHZ, output=output)
+    if not x:
         passed = False
+    results['FREQ_GHZ'] = x
 
-    if not check_ram(MIN_RAM_GB, output=output):
-    #     update_output("passed check_ram", output)
-    # else:
-    #     update_output(f"failed check_ram. required: {MIN_RAM_GB} GB", output)
+    x = check_ram(MIN_RAM_GB, output=output)
+    if not x:
         passed = False
+    results['RAM_GB'] = x
 
-    if not check_disk(MIN_DISK_GB, output=output):
-    #     update_output("passed check_disk", output)
-    # else:
-    #     update_output(f"failed check_disk. required: {MIN_DISK_GB} GB", output)
+    x = check_disk(MIN_DISK_GB, output=output)
+    if not x:
         passed = False
+    results['DISK_GB'] = x
 
-    if not check_os(MIN_LINUX_KERNEL, MIN_MACOS_MINOR, MIN_WINDOWS_MAJOR, output=output):
-    #     update_output("passed check_os", output)
-    # else:
-    #     # print(f"failed check_os. required: Windows {MIN_WINDOWS_MAJOR}+ / macOS 10.{MIN_MACOS_MINOR}+ / Linux kernel {'.'.join(map(str, MIN_LINUX_KERNEL))}+")
-    #     update_output(f"failed check_os. required: macOS 10.{MIN_MACOS_MINOR}+ / Linux kernel {'.'.join(map(str, MIN_LINUX_KERNEL))}+", output)
+    x = check_os(MIN_LINUX_KERNEL, MIN_MACOS_MINOR, MIN_WINDOWS_MAJOR, output=output)
+    if not x:
         passed = False
+    results['OS'] = f"{platform.system()} {platform.release()}"
 
     update_output("Running CPU benchmark (matrix multiplication)...", output)
-    if not check_cpu_benchmark(MAX_BENCHMARK_SECS, output=output):
+    x = check_cpu_benchmark(MAX_BENCHMARK_SECS, output=output)
+    if not x:
         passed = False
+    results['BENCHMARK_SECS'] = x
 
     update_output("Running internet speed test (this may take a moment)...", output)
     download_mbps, upload_mbps = check_internet_speed(MIN_DOWNLOAD_MBPS, MIN_UPLOAD_MBPS)
@@ -3856,28 +3896,27 @@ def run_hardware_test(remote_cmd=None, output=None) -> bool:
         f"{upload_mbps:.1f} Mbps, need ≥ {MIN_UPLOAD_MBPS} Mbps",
         output,
     )
+    results['DOWNLOAD'] = f"{download_mbps:.1f} Mbps"
+    results['UPLOAD'] = f"{upload_mbps:.1f} Mbps"
+
+    print("results",results)
+    node_data['meta']['hardware_results'] = results
 
     if not dl_passed:
-    #     update_output("passed check_download_speed", output)
-    # else:
-    #     update_output(f"failed check_download_speed. required: {MIN_DOWNLOAD_MBPS} Mbps", output)
         passed = False
- 
+
     if not ul_passed:
-    #     update_output("passed check_upload_speed", output)
-    # else:
-    #     update_output(f"failed check_upload_speed. required: {MIN_UPLOAD_MBPS} Mbps", output)
         passed = False
 
     if passed:
         update_output("\n\nRESULT: ✅ ALL checks passed.", output)
         # print("  This machine meets or exceeds a late-2010s mid-range baseline.")
-        return True
+        return True, node_data
     else:
         update_output("\n\nRESULT: ❌ One or more checks failed.", output)
         update_output("This machine does NOT fully meet the hardware requirements.", output)
         update_output("Speed tests vary from test to test.\n\n", output)
-        return False
+        return False, node_data
 
 def remote_hash_stepper(ssh, local_folder=None, remote_folder=None, text_display=None, ignore=None, ignore_file=".gitignore", force_reupload_script=False, delete_remote_orphans=False, dry_run=False): 
     print('-remote_hash_stepper',local_folder,remote_folder)

@@ -113,6 +113,14 @@ class SplashScreen(Screen):
 
         self.manager.current = 'operator_screen'
 
+    def update_msg(self, msg):
+        self.message.text = msg
+
+    def logged_in(self):
+        import time
+        time.sleep(2)
+        self.switch_to_operations(self)
+
     def process_seed_ip(self, seed_ip):
         self.message.text = 'Checking...'
         Clock.schedule_once(lambda dt, seed_ip=seed_ip: self.process_seed_ip_step2(seed_ip))
@@ -136,6 +144,17 @@ class SplashScreen(Screen):
                 if 'new_sonet' in operatorData:
                     del operatorData['new_sonet']
                 operatorData['sonet'] = sonetData
+
+                from pathlib import Path
+                filename = Path.home() / "Sonet" / ".data" / "settings.json"
+                with open(filename, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+
+                data['branch'] = sonetData['repo']['branch']
+
+                with open(filename, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=4)
+
                 write_operatorData(operatorData)
                 self.switch_to_login_page(self)
                 return
@@ -170,12 +189,15 @@ class SplashScreen(Screen):
                 msg = 'Failed contact'
                 r = requests.post('http://' + ip['address'] + '/accounts/get_user_login', data={'username':username.text}, timeout=6)
                 msg = 'Contact achieved'
+                # Clock.schedule_once(lambda dt: self.update_msg(msg))
+                Clock.schedule_once(lambda dt, line=msg: self.update_msg(line))
                 received_json = r.json()
                 print('r', received_json)
                 if 'message' in received_json:
                     if received_json['message']  == 'User not found':
                         if self.message:
-                            self.message.text = 'Login failed'
+                            # self.message.text = 'Login failed'
+                            Clock.schedule_once(lambda dt: self.update_msg('These Words Are Not Accepted'))
                         return
                     elif 'sonet' in received_json:
                         sonetData = json.loads(received_json['sonet'])
@@ -183,6 +205,7 @@ class SplashScreen(Screen):
                         message = received_json['message']
                         if message == 'User found':
                             print('user found')
+                            # Clock.schedule_once(lambda dt: self.update_msg('User Found'))
                             userData = json.loads(received_json['userData'])
                             upks = received_json['upks']
                             user_id = userData['id']
@@ -207,11 +230,13 @@ class SplashScreen(Screen):
                         else:
                             print('received_json',received_json)
                             if self.message:
-                                self.message.text = 'login fail: ' + received_json
+                                msg = 'login fail: ' + received_json
+                                Clock.schedule_once(lambda dt: self.update_msg(msg))
                         if not upkData:
-                            alert = 'Login failed'
+                            alert = 'These Words Are Not Accepted'
                             if self.message:
-                                self.message.text = alert
+                                msg = alert
+                                Clock.schedule_once(lambda dt: self.update_msg(msg))
                         else:
                             userData = sign(userData, privKey=privKey, pubKey=pubKey)
                             # parsedData = json.loads(userData)
@@ -228,19 +253,23 @@ class SplashScreen(Screen):
                                 write_operatorData(operatorData)
                                 verify_super_status(operatorData=operatorData) # may not be correctly setting superuser on login
                                 if self.message:
-                                    self.message.text = received_json['message']
-                                self.switch_to_operations(self)
+                                    msg = 'These Words Are Accepted'
+                                    # Clock.schedule_once(lambda dt: self.update_msg(msg))
+                                    Clock.schedule_once(lambda dt, line=msg: self.update_msg(line))
+                                Clock.schedule_once(lambda dt: self.logged_in())
                             elif received_json['message'] == 'Invalid Password':
-                                alert = 'Username does not match password'
+                                alert = 'These Words Are Not Accepted'
                                 if self.message:
-                                    self.message.text = alert
+                                    msg = alert
+                                    Clock.schedule_once(lambda dt: self.update_msg(msg))
                             else:
                                 alert = received_json['message']
                                 if 'error' in received_json:
                                     print('error',received_json['error'])
                                     alert = alert + ' err: ' + received_json['error']
                                 if self.message:
-                                    self.message.text = alert
+                                    msg = alert
+                                    Clock.schedule_once(lambda dt: self.update_msg(msg))
                         return
             except Exception as e:
                 print('login fail', str(e))

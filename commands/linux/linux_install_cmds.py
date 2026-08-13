@@ -155,9 +155,17 @@ def update_output(content, output_display=None):
         pass
 
 def hardware_check(output=None):
+    get_variables()
+    global node_data
+    global operatorData
+    global node_id
     from commands.utils import run_hardware_test
-    if not run_hardware_test(output=output):
+    result, node_data = run_hardware_test(output=output, node_data=node_data, operatorData=operatorData)
+    if not result:
         raise Exception('Failed hardware check')
+    else:
+        operatorData['myNodes'][node_id] = node_data
+        write_operatorData(operatorData)
 
 def pull_git(output, remote_cmd=False):
     from commands.utils import pull_git_server

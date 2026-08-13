@@ -2990,11 +2990,11 @@ class ChainsScreen(BoxLayout):
             self.mandatory_tree_view = self.main_root.add_node(CheckBoxTreeLabel(text='Mandatory Chains', identifier='Mandatory', active='mandatory'))
             for sChainName, sChainId in self.mandatoryChains.items():
                 self.main_root.add_node(CheckBoxTreeLabel(text=sChainName, identifier=sChainId, active='mandatory'), self.mandatory_tree_view)
-            self.special_tree_view = self.main_root.add_node(CheckBoxTreeLabel(text='Special', identifier='Special', active=self.get_active_state('Special')))
-            self.main_root.add_node(CheckBoxTreeLabel(text='All New Regions', identifier='New', active=self.get_active_state('New')), self.special_tree_view)
-            for sChain in specialChains:
-                if sChain != 'New':
-                    self.main_root.add_node(CheckBoxTreeLabel(text=sChain, identifier=sChain, active=self.get_active_state(sChain)), self.special_tree_view)
+            # self.special_tree_view = self.main_root.add_node(CheckBoxTreeLabel(text='Special', identifier='Special', active=self.get_active_state('Special')))
+            # self.main_root.add_node(CheckBoxTreeLabel(text='All New Regions', identifier='New', active=self.get_active_state('New')), self.special_tree_view)
+            # for sChain in specialChains:
+            #     if sChain != 'New':
+            #         self.main_root.add_node(CheckBoxTreeLabel(text=sChain, identifier=sChain, active=self.get_active_state(sChain)), self.special_tree_view)
             self.plugins_root = DynamicTreeView(root_options=dict(text='Plugins', is_open=True), hide_root=False, size_hint=(1, None))
             # self.plugins_root.is_open = True
             self.content.add_widget(self.plugins_root)
@@ -3080,6 +3080,7 @@ class ChainsScreen(BoxLayout):
             if regionModel_sign:
                 now = now_utc()
                 regionModel_sign['ParentRegion_obj'] = iden
+                regionModel_sign['commitChain'] = iden
                 regionModel['created'] = dt_to_string(now)
                 from commands.utils import get_most_recent_even_hour
                 regionModel_sign['created'] = dt_to_string(get_most_recent_even_hour(dt=now))
@@ -3152,16 +3153,20 @@ class ChainsScreen(BoxLayout):
             self.parent_screen.display_layout.add_widget(self.save_button)
 
     def get_active_state(self, key):
-        # print('-get_active_state',key)
+        print('-get_active_state',key)
         if not self.current_node:
             return False
         active = False
         if 'chainData' in self.current_node['meta']:
-            if self.current_node['meta']['chainData'].get('supported', None) and key in self.current_node['meta']['chainData']['supported']:
+            if self.current_node['meta']['chainData'].get('supported_chains', None) and key in self.current_node['meta']['chainData']['supported_chains']:
                 active = True
-            if self.current_node['meta']['chainData'].get('unsupported', None) and key in self.current_node['meta']['chainData']['unsupported']:
+            elif self.current_node['meta']['chainData'].get('supported_plugins', None) and key in self.current_node['meta']['chainData']['supported_plugins']:
+                active = True
+            elif self.current_node['meta']['chainData'].get('supported_regions', None) and key in self.current_node['meta']['chainData']['supported_regions']:
+                active = True
+            elif self.current_node['meta']['chainData'].get('unsupported', None) and key in self.current_node['meta']['chainData']['unsupported']:
                 active = False
-            if self.current_node['meta']['chainData'].get('half_selected', None) and key in self.current_node['meta']['chainData']['half_selected']:
+            elif self.current_node['meta']['chainData'].get('half_selected', None) and key in self.current_node['meta']['chainData']['half_selected']:
                 active = 'half'          
         return active
         
@@ -3169,12 +3174,15 @@ class ChainsScreen(BoxLayout):
         # print('-add_tree_data')
         for key, value in data.items():
             # print('key',key,'value',value)
+            extra = None
             if value['type'] in ['Planet','Continent','Country','Province','State','Territory']:
-                node = tree_view.add_node(CheckBoxTreeLabel(text=f'{key} ({value["type"]})', title=key, obj_type=value["obj_type"], identifier=value['id'], active=self.get_active_state(value['id']), parent=self, superuser=self.superuser), parent_node)
+                if 'reqs' in value:
+                    extra = value['reqs']
+                node = tree_view.add_node(CheckBoxTreeLabel(text=f'{key} ({value["type"]})', title=key, obj_type=value["obj_type"], identifier=value['id'], extra=extra, active=self.get_active_state(value['id']), parent=self, superuser=self.superuser), parent_node)
             elif value['type'] == 'Government':
-                node = tree_view.add_node(CheckBoxTreeLabel(text=f'{key} ({value["type"]})', identifier=value['regionId'], regionId=value['regionId'], obj_type=value["obj_type"], active=self.get_active_state(value['id']), parent=self, superuser=self.superuser), parent_node)
+                node = tree_view.add_node(CheckBoxTreeLabel(text=f'{key} ({value["type"]})', identifier=value['regionId'], regionId=value['regionId'], extra=extra, obj_type=value["obj_type"], active=self.get_active_state(value['id']), parent=self, superuser=self.superuser), parent_node)
             else:
-                node = tree_view.add_node(CheckBoxTreeLabel(text=f'{key} ({value["type"]})', identifier=value['id'], obj_type=value["obj_type"], active=self.get_active_state(value['id']), parent=self, superuser=self.superuser), parent_node)
+                node = tree_view.add_node(CheckBoxTreeLabel(text=f'{key} ({value["type"]})', identifier=value['id'], obj_type=value["obj_type"], extra=extra, active=self.get_active_state(value['id']), parent=self, superuser=self.superuser), parent_node)
             if value['type'] == 'Planet' or value['type'] == 'Continent':
                 node.is_open = True
             if value.get('children'):
@@ -3209,14 +3217,17 @@ class ChainsScreen(BoxLayout):
             objData = sign(objData)
             data = {'objData' : json.dumps(objData), 'nodeData' : json.dumps(full_nodeData['nodeData'])}
             # print('data',data)
-            r = connect_to_node(full_nodeData['settings']['localhost'], 'utils/get_object_id', data=data, operatorData=operatorData)
+            r = connect_to_node(full_nodeData['settings']['local_ip']+':'+full_nodeData['settings']['port'], 'utils/get_object_id', data=data, operatorData=operatorData)
             if r:
                 received_json = r.json()
                 print('message',received_json['message'])
                 if received_json['message'] == 'Success':
                     received_json['message'] = 'Error'
                     newId = received_json['obj_id']
-                    objData['id'] = newId
+                    if not objData['id']: # only working with plugins and regions here - only new id if new object
+                        objData['id'] = newId
+                        if 'networkChain' in objData:
+                            objData['networkChain'] = newId
                     temp_keys = fetch_secure_item('temp_keys')
                     if temp_keys:
                         new_obj = sign(objData, privKey=temp_keys['privKey'], pubKey=temp_keys['pubKey'], verify_result=True)
@@ -3277,13 +3288,14 @@ class ChainsScreen(BoxLayout):
         checked_plugins = []
         unchecked_items = []
         half_checked_items = []
+        reqs = {}
         # for i in self.mandatoryChains:
         #     checked_items.append(i)
         def sort_checkboxes(node, chains, checked_regions, checked_plugins, unchecked_items, half_checked_items):
             if isinstance(node, CheckBoxTreeLabel):
                 if node.checkbox.active and not node.checkbox.group:
                     if is_id(node.identifier):
-                        iden = generate_id({'objType': 'Blockchain', 'genesisId': node.identifier})
+                        iden = 'chnSo' + generate_id({'genesisId': node.identifier, 'objType': 'Blockchain'})
                     else:
                         iden = node.identifier
                     if iden not in chains:
@@ -3307,6 +3319,11 @@ class ChainsScreen(BoxLayout):
             return chains, checked_regions, checked_plugins, unchecked_items, half_checked_items
         
         for node in self.regions_root.iterate_all_nodes():
+            if isinstance(node, CheckBoxTreeLabel):
+                print('node.identifier',node.identifier)
+                print('node.extra',node.extra)
+                if node.extra:
+                    reqs[node.identifier] = {'title':node.title,'reqs':node.extra}
             chains, checked_regions, checked_plugins, unchecked_items, half_checked_items = sort_checkboxes(node, chains, checked_regions, checked_plugins, unchecked_items, half_checked_items)
 
         for node in self.plugins_root.iterate_all_nodes():
@@ -3330,25 +3347,163 @@ class ChainsScreen(BoxLayout):
         self.current_node['meta']['chainData']['half_selected'] = half_checked_items
         print('updated chainData:',self.current_node['meta']['chainData'])
         print('updated chainData is dict:',isinstance(self.current_node['meta']['chainData'], dict))
-        self.operatorData['myNodes'][self.current_node['nodeData']['id']] = self.current_node
-        write_operatorData(self.operatorData)
-        from commands.utils import update_remote_data
-        update_remote_data(self.current_node, operatorData=self.operatorData)
-        try:
-            if self.current_node['nodeData']['chain_array'] != self.current_node['meta']['chainData']['supported_chains'] and self.current_node['nodeData']['activated_dt']:
-                print('send chain updates')
-                from commands.utils import declare_self_active
-                resp = declare_self_active(True, activate_tasker=False)
-                print('resp of declare state chain screen',resp)
-        except Exception as e:
-            print('declare state chain screen fail',str(e))
-            pass
-        Clock.schedule_once(self.save_tree_data_step3, 0)
+        if reqs:
+            self.reqs = reqs
+            Clock.schedule_once(self.save_tree_data_step4, 0)
+        else:
+            self.operatorData['myNodes'][self.current_node['nodeData']['id']] = self.current_node
+            write_operatorData(self.operatorData)
+            from commands.utils import update_remote_data
+            update_remote_data(self.current_node, operatorData=self.operatorData)
+            try:
+                # not currently allowed
+                if self.current_node['nodeData']['chain_array'] != self.current_node['meta']['chainData']['supported_chains'] and self.current_node['nodeData']['activated_dt']:
+                    print('send chain updates')
+                    from commands.utils import declare_self_active
+                    resp = declare_self_active(True, activate_tasker=False)
+                    print('resp of declare state chain screen',resp)
+            except Exception as e:
+                print('declare state chain screen fail',str(e))
+                pass
+            Clock.schedule_once(self.save_tree_data_step3, 0)
     
     def save_tree_data_step3(self, instance):
         self.remove_widget(self.save_button)
         self.save_button = Button(text='Saved', size_hint=(1, None), height=dp(30))
         self.save_button.bind(on_press=self.save_tree_data)
+        self.add_widget(self.save_button)
+
+    def save_tree_data_step4(self, instance):
+        self.remove_widget(self.title)
+        self.scroll_view.remove_widget(self.content)
+        self.remove_widget(self.scroll_view)
+        self.remove_widget(self.save_button)
+
+        self.scroll_view = ScrollView(size_hint=(1, 1), do_scroll_x=False, do_scroll_y=True, scroll_type=['bars', 'content'],bar_width=17, bar_color=(1, 1, 1, 1), bar_inactive_color=(1, 1, 1, .3))
+        self.content = BoxLayout(orientation="vertical", size_hint_y=None)
+        self.content.bind(minimum_height=self.content.setter("height"))
+        self.title = Label(text='Required', size_hint_y=None, height=dp(30), halign='center')
+        self.add_widget(self.title)
+        self.add_widget(Divider(padding=0))
+        self.text_input = TextInput(
+            text="You selected items with requirements. Make sure all fields are filled below.",
+            size_hint_x=1,
+            size_hint_y=None,
+            halign="left",
+            multiline=True, 
+            background_color=dark_blue2,
+            foreground_color=(1, 1, 1, 1) 
+        )
+        self.text_input.bind(minimum_height=self.update_textinput_height)
+        Window.bind(size=self.update_textinput_height)
+        self.update_textinput_height()
+        self.content.add_widget(self.text_input)
+        self.scroll_view.add_widget(self.content)
+        self.add_widget(self.scroll_view)
+
+
+        self.items = {}
+        for req in self.reqs:
+            print('req',req)
+            for key, value in self.reqs[req]['reqs'].items():
+                print('k',key,'v',value)
+
+                layout1 = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30))
+                label1 = Label(text=self.reqs[req]['title'], size_hint=(1, 1), height=dp(30), size_hint_x=None, width=dp(130))
+                with label1.canvas.before:
+                    Color(1, 1, 1, 1)
+                # field = Label(text=value, size_hint=(1, 1), height=dp(30), size_hint_x=None, width=dp(130))
+                field = TextInput(text=value, size_hint=(1, None), height=dp(30), readonly=True)
+                layout1.add_widget(label1)
+                layout1.add_widget(field)
+                self.add_widget(layout1)
+                
+                layout2 = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30))
+                label2 = Label(text=key, size_hint=(1, 1), height=dp(30), size_hint_x=None, width=dp(130))
+                with label2.canvas.before:
+                    Color(1, 1, 1, 1)
+
+                text = ''
+                try:
+                    for i, x in self.current_node['meta']['abilities'][req].items():
+                        print('i',i, 'x',x)
+                        if i == key:
+                            text = x
+                            break
+                except Exception as e:
+                    print('err 545',str(e))
+                    pass
+                input = TextInput(text=text, hint_text="Required", size_hint=(1, None), height=dp(30))
+                layout2.add_widget(label2)
+                layout2.add_widget(input)
+                self.add_widget(layout2)
+                
+                self.items[req] = {'field':key, 'input':input}
+            self.add_widget(Divider(padding=0))
+
+        self.save_button = Button(text='Save', size_hint=(1, None), height=dp(30))
+        self.save_button.bind(on_press=self.save_tree_data2)
+        self.add_widget(self.save_button)
+
+    def save_tree_data2(self, instance):
+        # print('-save_tree_data')
+        self.remove_widget(self.save_button)
+        self.save_button = Button(text='Saving...', size_hint=(1, None), height=dp(30))
+        self.save_button.bind(on_press=self.save_tree_data2)
+        self.add_widget(self.save_button)
+        threading.Thread(target=self.save_tree_data_step5).start()
+
+    def save_tree_data_step5(self, instance=None):
+        print('-save_tree_data_step5')
+        complete = True
+        data = {}
+        new_abilities = {}
+
+        for key, value in self.items.items():
+            print('k',key,'v',value)
+            if not value['input'].text:
+                text = 'Please complete all fields'
+                complete = False
+                break
+            else:
+                new_abilities[f"{value['field']}s"] = []
+        print('next')
+
+        if complete:
+            for key, value in self.items.items():
+                print('k',key,'v',value)
+                new_abilities[f"{value['field']}s"].append(key)
+                data[key] = {value['field']:value['input'].text}
+
+            print('data',data)
+            print('new_abilities',new_abilities)
+            if 'abilities' not in self.current_node['nodeData']:
+                self.current_node['nodeData']['abilities'] = {}
+            if 'abilities' not in self.current_node['meta']:
+                self.current_node['meta']['abilities'] = {}
+            # x = {}
+            # z = {}
+            for key, value in data.items():
+                # x[key] = value
+                self.current_node['meta']['abilities'][key] = value
+            for key, value in new_abilities.items():
+                # z[key] = value
+                self.current_node['nodeData']['abilities'][key] = value
+            # print('x',x)
+            # print('z',z)
+            self.operatorData['myNodes'][self.current_node['nodeData']['id']] = self.current_node
+            write_operatorData(self.operatorData)
+            from commands.utils import update_remote_data
+            update_remote_data(self.current_node, operatorData=self.operatorData)
+
+            Clock.schedule_once(self.save_tree_data_step6, 0)
+        else:
+            Clock.schedule_once(lambda dt, line=text: self.save_tree_data_step6(self, text=line))
+
+    def save_tree_data_step6(self, instance, text='Saved'):
+        self.remove_widget(self.save_button)
+        self.save_button = Button(text=text, size_hint=(1, None), height=dp(30))
+        self.save_button.bind(on_press=self.save_tree_data2)
         self.add_widget(self.save_button)
 
     def user_passphrase_prompt(self, data=None, instance=None):
@@ -3739,7 +3894,7 @@ class NodesScreen(BoxLayout):
                         return 'Connection failed'
                 else:
                     Clock.schedule_once(lambda dt, line="\nRemote install not found.": update_text(self, line))
-                Clock.schedule_once(lambda dt, line="\nRemote created.": update_text(self, line))
+                Clock.schedule_once(lambda dt, line="\nRemote created.\nDone.": update_text(self, line))
                 write_operatorData(self.operatorData)
                 return remote_system
             else:
@@ -5308,7 +5463,7 @@ class SetupScreen(BoxLayout):
                         full_nodeData = operatorData['myNodes'][operatorData['selected_node']]
 
                     self.test_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30))
-                    self.test_label = Label(text='Quick Uninstall:', size_hint=(1, 1), height=dp(30), size_hint_x=None, width=dp(170))
+                    self.test_label = Label(text='Preserve Environment:', size_hint=(1, 1), height=dp(30), size_hint_x=None, width=dp(170))
                     with self.test_label.canvas.before:
                         Color(1, 1, 1, 1)
                     self.test_input = CheckBox(size_hint=(1, None), height=dp(30))
@@ -5485,8 +5640,8 @@ class SetupScreen(BoxLayout):
                     fields = self.operatorData['sonet']
                 else:
                     self.superuser = True
-                    fields = {'objType' : 'Sonet', 'Title' : '', 'Subtitle' : '', 'LogoLink' : "img/default_logo.png", 'Domain':'', 'info': {}, 'token_info' : {'name':'Token','plural':'Tokens'}, 'repo' : {'source':'github.com', 'repo':'', 'branch':'main'}}
-                    fields = {'objType' : 'Sonet', 'Title' : 'SoSayDev', 'Subtitle' : 'Development Branch', 'LogoLink' : "img/sologo.png", 'Domain':'sosaydev.com', 'info': {}, 'token_info' : {'name':'hoho','plural':'hohos'}, 'repo' : {'source':'github.com', 'repo':'SoSayUs', 'branch':'dev'}}
+                    fields = {'objType' : 'Sonet', 'Title' : '', 'Subtitle' : '', 'LogoLink' : "img/default_logo.png", 'Domain':'', 'info': {}, 'token_info' : {'name':'Token','plural':'Tokens'}, 'repo' : {'source':'github.com', 'repo':'', 'branch':'main'}, 'node_requirements': {'MIN_LOGICAL_CORES':4,'MIN_FREQ_GHZ':2.0,'MIN_RAM_GB':7.5,'MIN_DISK_GB':200,'MIN_WINDOWS_MAJOR':10,'MIN_MACOS_MINOR':13,'MIN_LINUX_KERNEL':(6, 00),'MIN_DOWNLOAD_MBPS':21.0,'MIN_UPLOAD_MBPS':4.0,'MAX_BENCHMARK_SECS':6.0,'MIN_DOWNLOAD_MBPS':5.0}}
+                    fields = {'objType' : 'Sonet', 'Title' : 'SoSayDev', 'Subtitle' : 'Development Branch', 'LogoLink' : "img/sologo.png", 'Domain':'sosaydev.com', 'info': {}, 'token_info' : {'name':'hoho','plural':'hohos'}, 'repo' : {'source':'github.com', 'repo':'SoSayUs', 'branch':'dev'}, 'node_requirements': {'MIN_LOGICAL_CORES':4,'MIN_FREQ_GHZ':2.0,'MIN_RAM_GB':7.5,'MIN_DISK_GB':200,'MIN_WINDOWS_MAJOR':10,'MIN_MACOS_MINOR':13,'MIN_LINUX_KERNEL':(6, 00),'MIN_DOWNLOAD_MBPS':21.0,'MIN_UPLOAD_MBPS':2.0,'MAX_BENCHMARK_SECS':10.0,'MIN_DOWNLOAD_MBPS':5.0}}
             else: # install new network
                 print('else2 setup')
                 fields = {} 
@@ -6401,7 +6556,8 @@ class SetupScreen(BoxLayout):
 
                             text = '\nIntializing database...\n'
                             Clock.schedule_once(lambda dt, line=text: self.update_text(line))
-                            time.sleep(3)
+                            time.sleep(1)
+                            new_net = operatorData['new_sonet']
 
                             user_id = super_id(create=now, net=newnet, operatorData=operatorData)
 
@@ -6450,8 +6606,9 @@ class SetupScreen(BoxLayout):
                             # should include in get_or_create_node_obj instead of here
                             wal_id_data = {'objType':'Wallet','User_obj':user_id,'Name':'Rewards'}
                             id_len = received_json['id_len']
-                            reward_walletData['id'] = 'walSo' + generate_id(wal_id_data, length=id_len)
+                            reward_walletData['id'] = '1walSo' + generate_id(wal_id_data, length=id_len)
                             reward_walletData['User_obj'] = user_id
+                            reward_walletData['networkChain'] = user_id
                             reward_walletData['created'] = dt_to_string(now)
                             reward_walletData['lastUpdate'] = dt_to_string(now)
                             reward_walletData['Name'] = f"Rewards-{self_nodeData['id']}"
@@ -6504,6 +6661,7 @@ class SetupScreen(BoxLayout):
                             userData['id'] = user_id
                             userData['username'] = operatorData['username']
                             userData['created'] = dt_to_string(now)
+                            userData['networkChain'] = user_id
                             userData['lastUpdate'] = dt_to_string(now_utc())
                             userData['signkey_dt'] = dt_to_string(now)
                             for key, value in userData.items():
@@ -6511,7 +6669,7 @@ class SetupScreen(BoxLayout):
                                     userData[key] = json.dumps([])
 
                             node_keys = fetch_secure_item('node_keys')
-                            self_node_upkData['id'] = 'upkSo' + generate_id(node_keys['pubKey'], length=20)
+                            self_node_upkData['id'] = hash_upk_id(node_keys['pubKey'])
                             self_node_upkData['created'] = dt_to_string(now)
                             self_node_upkData['lastUpdate'] = dt_to_string(now)
                             self_node_upkData['publicKey'] = node_keys['pubKey']
@@ -6563,7 +6721,7 @@ class SetupScreen(BoxLayout):
                                 text = 'Creating Second SuperUser...\n'
                                 Clock.schedule_once(lambda dt, line=text: self.update_text(line))
                                 second_super_id = 'usrSo' + generate_id(length=20)
-                                second_super_id = 'usrSo3axaDYOu8v1AsMueuijU'
+                                second_super_id = 'usrSo3axaDYOu8v1AsM'
                                 error_code = 'continue4'
                                 keyPair = createKeyPair(second_super_id, operatorData['second_userPass'], 'account', key_strength='ML_DSA_44')
                                 second_privKey = keyPair[0]
@@ -6637,6 +6795,7 @@ class SetupScreen(BoxLayout):
                                 userData['id'] = second_super_id
                                 userData['username'] = operatorData['second_username']
                                 userData['created'] = dt_to_string(now)
+                                userData['networkChain'] = second_super_id
                                 userData['lastUpdate'] = dt_to_string(now_utc())
                                 userData['signkey_dt'] = dt_to_string(now)
                                 for key, value in userData.items():
@@ -6664,7 +6823,6 @@ class SetupScreen(BoxLayout):
                                         del operatorData['second_username']
                                 
                                     new_node_meta = self_nodeDetails['meta']
-                                    new_net = operatorData['new_sonet']
                                     if 'info' in new_net and 'Domain' in new_net and new_net['Domain']:
                                         new_node_meta['domain'] = new_net['Domain']
                                     new_node_meta['is_installed'] = True
@@ -6730,8 +6888,9 @@ class SetupScreen(BoxLayout):
                                         models = {'Earth':earthModel, 'Accounts Plugin':accountsPlugin, 'Network Plugin':networkPlugin, 'Posts Plugin':postsPlugin, 'Transactions Plugin':transactionsPlugin}
                                         if sovotePlugin:
                                             models['SoVote Plugin'] = sovotePlugin
+                                            # models['Wallet'] = reward_walletData
                                         
-                                        def set_obj(objModel, msg):
+                                        def set_obj(objModel, msg, keys='super'):
                                             print('objModel',objModel)
                                             objModel['created'] = dt_to_string(now)
                                             if 'lastUpdate' in objModel:
@@ -6742,7 +6901,15 @@ class SetupScreen(BoxLayout):
                                                 objModel['User_obj'] = user_id
                                             if 'CreatorNode_obj' in objModel:
                                                 objModel['CreatorNode_obj'] = self_nodeData['id']
-                                            objData = sign(objModel, privKey=super_keyPair[0], pubKey=super_keyPair[1], verify_result=True, operatorData=operatorData, bypass_last_updated_dt=True)
+                                            if 'commitChain' in objModel:
+                                                objModel['commitChain'] = sonet['id']
+                                            if 'validatorNodeId' in objModel:
+                                                objModel['validatorNodeId'] = self_nodeData['id']
+                                            if keys == 'super':
+                                                objData = sign(objModel, privKey=super_keyPair[0], pubKey=super_keyPair[1], verify_result=True, operatorData=operatorData, bypass_last_updated_dt=True)
+                                            else:
+                                                objData = sign(objModel, privKey=privKey, pubKey=pubKey, bypass_last_updated_dt=True)
+
                                             if objModel['objType'] == 'Region':
                                                 super_share = True
                                             else:
@@ -6750,8 +6917,8 @@ class SetupScreen(BoxLayout):
                                             data = {'objData': json.dumps(objData), 'super_share': super_share}
                                             try:
                                                 r = connect_to_node(new_node_settings["localhost"], 'utils/set_object_data', data=data, operatorData=operatorData, node_setup=True)
-                                                print('actually almost done')
                                                 received_json = r.json()
+                                                print('received_json',received_json)
                                                 if received_json['message'] == 'Success':
                                                     text = f'{msg} created.'
                                                     Clock.schedule_once(lambda dt, line=text: self.update_text(line))
@@ -6762,7 +6929,11 @@ class SetupScreen(BoxLayout):
                                         
 
                                         for msg, model in models.items():
-                                            z = set_obj(model, msg)
+                                            if msg == 'Wallet':
+                                                keys = 'account'
+                                            else:
+                                                keys = 'super'
+                                            z = set_obj(model, msg, keys)
                                             if z != True:
                                                 Clock.schedule_once(lambda dt, line=z: self.update_text(line))
                                                 app_operational = False
@@ -7017,7 +7188,7 @@ class SetupScreen(BoxLayout):
             if next_cmd:
                 next_cmd()
 
-        self.text_input.text = 'The settings you selected require advanced keys.\n\nPassphrase needed to generate required keys.\n'
+        self.text_input.text = 'The selected settings require advanced keys.\n\nPassphrase needed to generate required keys.\n'
         self.pass_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30))
         self.toggle_button = Button(text='Show', size_hint_x=None, width=dp(70))
         self.pass_label = Label(text="User Passphrase:", size_hint=(1, 1), height=dp(30), size_hint_x=None, width=dp(130))

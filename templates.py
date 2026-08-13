@@ -188,7 +188,7 @@ def seed_ip_content(layout, page_instance, version=None):
         if 'seed_ip' in operatorData:
             seed_ip = operatorData['seed_ip']
         else:
-            seed_ip = '127.0.0.1:9909'
+            seed_ip = 'SoSayUs.com'
         centerSection = RelativeLayout()
         userInput = BoxLayout(orientation='horizontal', size_hint=(0.70, None), height=100, pos_hint={'center_x': 0.5})
         centerSection.add_widget(userInput)
@@ -307,7 +307,7 @@ def login_page_content(layout, page_instance):
     layout.add_widget(bottomSection)
 
     field4 = BoxLayout(orientation='horizontal', size_hint=(1, None), height=100)
-    message = Label(text='Store username and 24 word passphrase in a secure place.\nPassphrase is not saved.\nPassphrase cannot be reset if lost.')
+    message = Label(text='Keep it Secret.\nKeep it Safe.\n')
     page_instance.message = message
 
     field4.add_widget(message)
@@ -646,11 +646,13 @@ class Divider(Widget):
 
 
 class CheckBoxTreeLabel(BoxLayout, TreeViewNode):
-    def __init__(self, text, identifier=0, regionId=None, title=None, obj_type=None, active=True, parent=None, button=False, superuser=False, new_child_btn=True, **kwargs):
+    def __init__(self, text, identifier=0, regionId=None, title=None, obj_type=None, extra=None, active=True, parent=None, button=False, superuser=False, new_child_btn=True, **kwargs):
         super(CheckBoxTreeLabel, self).__init__(orientation='horizontal', **kwargs)
         from ops import w_scale, t_scale
         self.identifier = identifier
         self.obj_type = obj_type
+        self.extra = extra
+        self.title = title
         self.padding = [10, 10, 10, 10]
         self.spacing = 20 
         self.checkbox = None 
