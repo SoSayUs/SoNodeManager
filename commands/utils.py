@@ -3410,7 +3410,13 @@ def setup_ssh(host, user, password, iden):
                 system = get_device_system()
                 if system == 'linux':
                     package_manager = get_package_manager()
-                    subprocess.run(['sudo', '-S', package_manager, 'install', '-y', 'sshpass'], check=True)
+                    subprocess.run(
+                        ['sudo', '-S', package_manager, 'install', '-y', 'sshpass'],
+                        input=f"{fetch_secure_item("sysPass")}\n",
+                        text=True,
+                        check=True,
+                        capture_output=True
+                    )
                 elif system == 'mac':
                     def find_brew():
                         for p in ("/opt/homebrew/bin/brew", "/usr/local/bin/brew"):
@@ -3418,7 +3424,13 @@ def setup_ssh(host, user, password, iden):
                                 return p
                         return "/opt/homebrew/bin/brew"
                     brew_path = find_brew()
-                    subprocess.run([brew_path, "install", 'sshpass'], check=True)
+                    subprocess.run(
+                        ['sudo', '-S', brew_path, "install", 'sshpass'],
+                        input=f"{fetch_secure_item("sysPass")}\n",
+                        text=True,
+                        check=True,
+                        capture_output=True
+                    )
                 subprocess.run(cmd, check=True)
 
     # 1. Create key if missing

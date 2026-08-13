@@ -3709,6 +3709,8 @@ class NodesScreen(BoxLayout):
         self.add_widget(self.scroll_view)
 
         fields = ['nickname', 'local_address', 'port', 'remote_address', 'remote_port', 'username', 'password']
+        if not fetch_secure_item("sysPass"):
+            fields.append('local_password')
         for i in fields:
             if 'port' in i:
                 self.content.add_widget(FieldRow(i, '22', editable=True))
@@ -3872,6 +3874,11 @@ class NodesScreen(BoxLayout):
                 self.operatorData = get_operatorData(self.operatorData)
                 if not 'myRemotes' in self.operatorData:
                     self.operatorData['myRemotes'] = {}
+                if not fetch_secure_item("sysPass"):
+                    print('remote_data',remote_data)
+                    print("remote_data['local_password']",remote_data['local_password'])
+                    store_secure_item('sysPass', remote_data['local_password'])
+                    del remote_data['local_password']
                 
                 import base62
                 import uuid
