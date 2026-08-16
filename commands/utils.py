@@ -3410,9 +3410,10 @@ def setup_ssh(host, user, password, iden):
                 system = get_device_system()
                 if system == 'linux':
                     package_manager = get_package_manager()
+                    print('package_manager',password)
                     subprocess.run(
                         ['sudo', '-S', package_manager, 'install', '-y', 'sshpass'],
-                        input=f"{fetch_secure_item("sysPass")}\n",
+                        input=f"{fetch_secure_item('sysPass')}\n",
                         text=True,
                         check=True,
                         capture_output=True
@@ -3426,7 +3427,7 @@ def setup_ssh(host, user, password, iden):
                     brew_path = find_brew()
                     subprocess.run(
                         ['sudo', '-S', brew_path, "install", 'sshpass'],
-                        input=f"{fetch_secure_item("sysPass")}\n",
+                        input=f"{fetch_secure_item('sysPass')}\n",
                         text=True,
                         check=True,
                         capture_output=True
