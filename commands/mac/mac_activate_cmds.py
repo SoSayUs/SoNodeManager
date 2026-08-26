@@ -5,7 +5,7 @@ import getpass
 from os.path import expanduser
 import shutil
 
-from ..utils import get_operatorData, get_node_list
+from ..utils import get_operatorData, get_node_list, write_operatorData
 from .mac_install_cmds import config_nginx, setup_gunicorn, config_supervisor, write_supervisor_plist, setup_firewall, update_output, find_brew
 
 
@@ -76,6 +76,18 @@ def get_variables(remote_cmd=False):
 
         branch = repo_data['branch'] # main
 
+def hardware_check(output=None, remote_cmd=False):
+    get_variables()
+    global node_data
+    global operatorData
+    global node_id
+    from commands.utils import run_hardware_test
+    result, node_data = run_hardware_test(output=output, node_data=node_data, operatorData=operatorData)
+    if not result:
+        raise Exception('Failed hardware check')
+    else:
+        operatorData['myNodes'][node_id] = node_data
+        write_operatorData(operatorData)
 
 def update_repo(output=None, remote_cmd=False):
     get_variables()
@@ -301,6 +313,7 @@ remove_for_tasker = [
 ]
 
 special_commands = [
+    {'cmd':'hardware_check', 'reqs':'output_display'},
     {'cmd':'update_repo', 'reqs':'output_display'},
     {'cmd':'run_adjust_settings'},
     {'cmd':'run_setup_firewall'},
@@ -322,6 +335,7 @@ action_cmds = [
     ["sudo", "-S", "echo", "activating"],
     ['run_command', 'get_variables'],
     ['run_command', 'update_repo'],
+    ['run_command', 'hardware_check'],
 
     # ['run_command', 'run_setup_firewall'],
 
@@ -342,6 +356,7 @@ action_cmds = [
     [brew_path, 'services', 'start', 'postgresql'],
     ["sudo", "-S", f"{homepath}/Sonet/.data/env/bin/python3", f"{homepath}/Sonet/SoNodeServer/manage.py", "migrate"],
     ["raise_if_error", f"{homepath}/Sonet/.data/env/bin/python3", f"{homepath}/Sonet/SoNodeServer/manage.py", "check"],
+    ["raise_if_error", "sudo", "-S", f"{homepath}/Sonet/.data/env/bin/python3", f"{homepath}/Sonet/SoNodeServer/manage.py", "collectstatic", "--noinput"],
     ['sudo', '-S', 'chown', '-R', f'{username}:staff', f'/Users/{username}/Sonet/.data/logs'],
     ['sudo', '-S', 'chown', '-R', f'{username}:staff', f'/Users/{username}/Sonet/.data/supervisor'],
     ['/opt/homebrew/bin/supervisord', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf'],

@@ -112,6 +112,8 @@ def pause(remote_cmd=False):
 
 def special_job(output=None, remote_cmd=False):
     # print('-special_job')
+    from .linux_install_cmds import edit_supervisor
+    edit_supervisor(install=False, output=output, remote_cmd=remote_cmd)
     pass
 
 special_commands = [
@@ -126,12 +128,15 @@ special_commands = [
 action_cmds = [
     ['echo','this is an update check'],
     ['run_command', 'run_update_repo'],
-    # ['run_command', 'special_job'],
+    ['run_command', 'special_job'],
     ['run_command', 'run_adjust_settings_update'],
     ["sudo", "-S", f"{homepath}/Sonet/.data/env/bin/python3", f"{homepath}/Sonet/SoNodeServer/manage.py", "migrate"],
     ['run_command', 'run_adjust_settings_update'], # seemed to need a second instance after adding tor to supervisor - was causing nginx restart issue
     ["raise_if_error", "sudo", "-S", f"{homepath}/Sonet/.data/env/bin/python3", f"{homepath}/Sonet/SoNodeServer/manage.py", "check"],
+    ["raise_if_error", "sudo", "-S", f"{homepath}/Sonet/.data/env/bin/python3", f"{homepath}/Sonet/SoNodeServer/manage.py", "collectstatic", "--noinput"],
     ['run_command', 'restart_cloudflare_service'],
+    ["sudo", "-S", "supervisorctl", "reread"],
+    ["sudo", "-S", "supervisorctl", "update"],
     ["sudo", "-S", "supervisorctl", "reload"],
     # ["sudo", "-S", 'semanage', 'fcontext', '-a', '-t', 'httpd_config_t', f"/etc/nginx/sites-available/sonode"],
     # ["sudo", "-S", 'restorecon', '-v', f"/etc/nginx/sites-available/sonode"],

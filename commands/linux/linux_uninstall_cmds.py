@@ -88,7 +88,7 @@ action_cmds = [
     ["sudo", "-S", "systemctl", "stop", "gunicorn.socket"],
     ["sudo", "-S", "systemctl", "stop", "gunicorn"],
     ["sudo", "-S", "systemctl", "stop", "nginx"],
-    ['sudo', 'systemctl', 'disable', 'nginx'],
+    ['sudo', "-S", 'systemctl', 'disable', 'nginx'],
     ["sudo", "-S", "supervisorctl", "reload"],
     ['run_command', 'write_gunicorn_socket'],
     ['run_command', 'write_gunicorn_service'],

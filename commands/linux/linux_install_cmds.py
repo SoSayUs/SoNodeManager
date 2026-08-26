@@ -154,7 +154,7 @@ def update_output(content, output_display=None):
         # print('update_output err',str(e))
         pass
 
-def hardware_check(output=None):
+def hardware_check(output=None, remote_cmd=False):
     get_variables()
     global node_data
     global operatorData
@@ -599,7 +599,7 @@ def edit_supervisor(install=True, output=None, remote_cmd=False):
         "[program:django_rq_main]\n",
         f"command=/home/{username}/Sonet/.data/env/bin/python -u manage.py rqworker main\n",
         f"directory=/home/{username}/Sonet/SoNodeServer\n",
-        '''process_name=%(program_name)s-%(process_num)s\n''',
+        '''process_name=%(program_name)s\n''',
         "numprocs=1\n",
         "autostart=true\n",
         "autorestart=true\n",
@@ -615,7 +615,7 @@ def edit_supervisor(install=True, output=None, remote_cmd=False):
         "[program:django_rq_high]\n",
         f"command=/home/{username}/Sonet/.data/env/bin/python -u manage.py rqworker high\n",
         f"directory=/home/{username}/Sonet/SoNodeServer\n",
-        '''process_name=%(program_name)s-%(process_num)s\n''',
+        '''process_name=%(program_name)s\n''',
         "numprocs=1\n",
         "autostart=true\n",
         "autorestart=true\n",
@@ -631,7 +631,7 @@ def edit_supervisor(install=True, output=None, remote_cmd=False):
         "[program:django_rq_low]\n",
         f"command=/home/{username}/Sonet/.data/env/bin/python -u manage.py rqworker low\n",
         f"directory=/home/{username}/Sonet/SoNodeServer\n",
-        '''process_name=%(program_name)s-%(process_num)s\n''',
+        '''process_name=%(program_name)s\n''',
         "numprocs=1\n",
         "autostart=true\n",
         "autorestart=true\n",
@@ -647,7 +647,7 @@ def edit_supervisor(install=True, output=None, remote_cmd=False):
         "[program:django_rq_chat]\n",
         f"command=/home/{username}/Sonet/.data/env/bin/python -u manage.py rqworker chat\n",
         f"directory=/home/{username}/Sonet/SoNodeServer\n",
-        '''process_name=%(program_name)s-%(process_num)s\n''',
+        '''process_name=%(program_name)s\n''',
         "numprocs=1\n",
         "autostart=true\n",
         "autorestart=true\n",
@@ -663,7 +663,7 @@ def edit_supervisor(install=True, output=None, remote_cmd=False):
         "[program:django_rq_super]\n",
         f"command=/home/{username}/Sonet/.data/env/bin/python -u manage.py rqworker super\n",
         f"directory=/home/{username}/Sonet/SoNodeServer\n",
-        '''process_name=%(program_name)s-%(process_num)s\n''',
+        '''process_name=%(program_name)s\n''',
         "numprocs=1\n",
         "autostart=true\n",
         "autorestart=true\n",

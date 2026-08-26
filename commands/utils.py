@@ -251,7 +251,7 @@ def string_to_dt(dt_str):
 def update_output(line, output):
     
     if line and isinstance(line, str):
-        print('-update_output',line)
+        # print('-update_output',line)
         if '-noBreak-' in line:
             line = line.replace('-noBreak-','')
         elif not line.endswith('\n'):
@@ -1192,6 +1192,7 @@ def sync_database(output=None, SetupScreen=None, seed=False, total_sync=False):
     # make sure connect_to_node is signing with proper keys
     operatorData = get_remote_opData(fetch_data=True)
     operatorData['syncingDB'] = dt_to_string(now_utc())
+    iden = None
     fullNode_data = {}
     if 'local_nodeId' in operatorData and operatorData['local_nodeId'] and operatorData['local_nodeId'] != '' and str(operatorData['local_nodeId']) != 'None':
         fullNode_data = operatorData['myNodes'][operatorData['local_nodeId']]
@@ -1436,7 +1437,7 @@ def sync_database(output=None, SetupScreen=None, seed=False, total_sync=False):
                                                         is_processing = False
                                                         return {'result' : 'Failed processing'}
                                                     elif output and process_json['message'] == 'Success' and process_json['result'] == 'running':
-                                                        print('waiting...')
+                                                        print('waiting... attempts:',attempts)
                                                         if 'added_to_queue' in process_json and process_json['added_to_queue']:
                                                             attempts += 1
                                                             update_output(f'-noBreak-+', output)
@@ -1611,9 +1612,98 @@ def sync_database(output=None, SetupScreen=None, seed=False, total_sync=False):
                 return requested_update_dt, obj_count
         return None, 0
     
+    def run_data_task(target, check_for_latest=True):
+        print('-run_data_task',target)
+        try:
+            if SetupScreen and hasattr(SetupScreen, 'abort_function') and SetupScreen.abort_function:
+                SetupScreen.parent_screen.job_running = False
+                return False
+            if check_for_latest:
+                requested_update_dt, obj_count = check_latest_update(target)
+            else:
+                requested_update_dt = None
+                obj_count = 'x'
+            signedRequest = json.dumps(sign({'type':target,'items' : 'All', 'index' : 0,'dt':dt_to_string(now_utc()),'requested_update_dt':requested_update_dt, 'obj_count':obj_count}, operatorData=operatorData, node_keys=node_keys))
+            if output:
+                if target.endswith('s'):
+                    print_text = f'\nUpdating {target}...\n'
+                else:
+                    print_text = f'\nUpdating {target}s...\n'
+                update_output(print_text, output)
+            data = {'userData':userData, 'upkData':upkData, 'nodeData':selfNode, 'request':signedRequest}
+            result = get_data(data, output=output)
+            if result and result == False:
+                update_output(f'Aborted\n', output)
+            elif result and 'result' in result and output:
+                if result['result'] == 'True':
+                    update_output(f'Success\n', output)
+                    return True
+                elif 'message' in result and result["message"] == 'Not Found' and requested_update_dt:
+                    update_output(f'None New\n', output)
+                    return True
+                else:
+                    resp = 'err'
+                    if 'result' in result:
+                        resp = f'{resp} -result:{result["result"]}'
+                    if 'message' in result:
+                        resp = f'{resp} -msg:{result["message"]}'
+                    update_output(f'{resp}\n', output)
+            elif 'message' in result and output:
+                if result['message'].lower() == 'success':
+                    update_output(f'Success\n', output)
+                    return True
+                else:
+                    update_output(f"{result['message']}\n", output)
+        except Exception as e:
+            print('data task err',str(e))
+            update_output(f'error 3: {e}\n', output)
+        return False
+
+    def run_chain_task(target, node_list=None, target_node=iden):
+        if not node_list:
+            nonlocal nodes
+            node_list = nodes
+        print('-run_chain_task',target,nodes)
+        if SetupScreen and hasattr(SetupScreen, 'abort_function') and SetupScreen.abort_function:
+            SetupScreen.parent_screen.job_running = False
+            return False
+        try:
+            if '-' in target:
+                a = target.find('-')
+                genesisId = target[:a]
+                req_type = 'Blockchain'
+            elif '_Blocks' in target:
+                req_type = target
+                genesisId = target
+            else:
+                genesisId = target
+                req_type = 'Blockchain'
+            update_output(f'\nUpdating {target}...\n', output)
+            requested_update_dt, obj_count = check_latest_update(target)
+            signedRequest = json.dumps(sign({'type':req_type,'genesisId':genesisId,'dt':dt_to_string(now_utc()),'item_count':'single','requested_update_dt':requested_update_dt, 'obj_count':obj_count}, operatorData=operatorData, node_keys=node_keys))
+            data = {'userData':userData, 'upkData':upkData, 'nodeData':selfNode, 'request':signedRequest}
+            result = get_chain(genesisId, node_list, data, output=output, target_node=target_node)
+            if result and result == False:
+                update_output(f'Aborted\n', output)
+            if result and 'result' in result and output:
+                if result['result'] == 'True' or result['result'] == 'Success':
+                    update_output(f'Success\n', output)
+                    return True
+                else:
+                    resp = 'err'
+                    if 'result' in result:
+                        resp = f'{resp} -result:{result["result"]}'
+                    if 'message' in result:
+                        resp = f'{resp} -msg:{result["message"]}'
+                    update_output(f'{resp}\n', output)
+        except Exception as e:
+            print('chain task err')
+            update_output(f'error 4: {e}\n', output)
+        return False
+    
+
     nodes, operatorData, network_contacted = get_node_list(operatorData=operatorData, self_node=fullNode_data, refresh_list=True, return_refresh_result=True, exclude_self=True)
     print('sync nodes:',nodes)
-    iden = None
     userData = json.dumps(sign(operatorData['userData'], operatorData=operatorData, node_keys=node_keys))
     if 'upkData' in operatorData:   
         upkData = json.dumps(sign(operatorData['upkData'], operatorData=operatorData, node_keys=node_keys))
@@ -1642,52 +1732,6 @@ def sync_database(output=None, SetupScreen=None, seed=False, total_sync=False):
         signedNode = sign(full_nodeData['nodeData'], operatorData=operatorData, node_keys=node_keys)
         selfNode = json.dumps(signedNode)
 
-        def run_data_task(target, check_for_latest=True):
-            print('-run_data_task',target)
-            try:
-                if SetupScreen and hasattr(SetupScreen, 'abort_function') and SetupScreen.abort_function:
-                    SetupScreen.parent_screen.job_running = False
-                    return False
-                if check_for_latest:
-                    requested_update_dt, obj_count = check_latest_update(target)
-                else:
-                    requested_update_dt = None
-                    obj_count = 'x'
-                signedRequest = json.dumps(sign({'type':target,'items' : 'All', 'index' : 0,'dt':dt_to_string(now_utc()),'requested_update_dt':requested_update_dt, 'obj_count':obj_count}, operatorData=operatorData, node_keys=node_keys))
-                if output:
-                    if target.endswith('s'):
-                        print_text = f'\nUpdating {target}...\n'
-                    else:
-                        print_text = f'\nUpdating {target}s...\n'
-                    update_output(print_text, output)
-                data = {'userData':userData, 'upkData':upkData, 'nodeData':selfNode, 'request':signedRequest}
-                result = get_data(data, output=output)
-                if result and result == False:
-                    update_output(f'Aborted\n', output)
-                elif result and 'result' in result and output:
-                    if result['result'] == 'True':
-                        update_output(f'Success\n', output)
-                        return True
-                    elif 'message' in result and result["message"] == 'Not Found' and requested_update_dt:
-                        update_output(f'None New\n', output)
-                        return True
-                    else:
-                        resp = 'err'
-                        if 'result' in result:
-                            resp = f'{resp} -result:{result["result"]}'
-                        if 'message' in result:
-                            resp = f'{resp} -msg:{result["message"]}'
-                        update_output(f'{resp}\n', output)
-                elif 'message' in result and output:
-                    if result['message'].lower() == 'success':
-                        update_output(f'Success\n', output)
-                        return True
-                    else:
-                        update_output(f"{result['message']}\n", output)
-            except Exception as e:
-                print('data task err',str(e))
-                update_output(f'error 3: {e}\n', output)
-            return False
 
         signedRequest = json.dumps(sign({'type':'Blockchain','chainId':'all','dt':dt_to_string(now_utc())}, operatorData=operatorData, node_keys=node_keys))
         data = {'userData':userData, 'upkData':upkData, 'nodeData':selfNode, 'request':signedRequest}
@@ -1697,76 +1741,91 @@ def sync_database(output=None, SetupScreen=None, seed=False, total_sync=False):
         if cont:
             network_contacted = True
             cont = run_data_task('Sonet')
-        if 'node_type' not in full_nodeData['settings']:
-            full_nodeData['settings']['node_type'] = 'server/maintainer'
-        if 'start_local_install' in operatorData:
-            del operatorData['start_local_install']
-            write_remote_opData(operatorData, update_remote=True)
-        if cont and 'maintainer' in full_nodeData['settings']['node_type']:
-            cont = run_data_task('Wallet')
-        if cont:
-            cont = run_data_task('Node', check_for_latest=False)
+        # if cont:
+        #     cont = run_data_task('Node', check_for_latest=False)
+        # if cont:
+        #     cont = run_data_task('Plugin')
+                        
+        # if 'node_type' not in full_nodeData['settings']:
+        #     full_nodeData['settings']['node_type'] = 'server/maintainer'
+        # if 'start_local_install' in operatorData:
+        #     del operatorData['start_local_install']
+        #     write_remote_opData(operatorData, update_remote=True)
         
-        def run_chain_task(target, node_list=None, target_node=iden):
-            if not node_list:
-                nonlocal nodes
-                node_list = nodes
-            print('-run_chain_task',target,nodes)
-            if SetupScreen and hasattr(SetupScreen, 'abort_function') and SetupScreen.abort_function:
-                SetupScreen.parent_screen.job_running = False
-                return False
-            try:
-                if '-' in target:
-                    a = target.find('-')
-                    genesisId = target[:a]
-                    req_type = 'Blockchain'
-                elif '_Blocks' in target:
-                    req_type = target
-                    genesisId = target
-                else:
-                    genesisId = target
-                    req_type = 'Blockchain'
-                update_output(f'\nUpdating {target}...\n', output)
-                requested_update_dt, obj_count = check_latest_update(target)
-                signedRequest = json.dumps(sign({'type':req_type,'genesisId':genesisId,'dt':dt_to_string(now_utc()),'item_count':'single','requested_update_dt':requested_update_dt, 'obj_count':obj_count}, operatorData=operatorData, node_keys=node_keys))
-                data = {'userData':userData, 'upkData':upkData, 'nodeData':selfNode, 'request':signedRequest}
-                result = get_chain(genesisId, node_list, data, output=output, target_node=target_node)
-                if result and result == False:
-                    update_output(f'Aborted\n', output)
-                if result and 'result' in result and output:
-                    if result['result'] == 'True' or result['result'] == 'Success':
-                        update_output(f'Success\n', output)
-                        return True
-                    else:
-                        resp = 'err'
-                        if 'result' in result:
-                            resp = f'{resp} -result:{result["result"]}'
-                        if 'message' in result:
-                            resp = f'{resp} -msg:{result["message"]}'
-                        update_output(f'{resp}\n', output)
-            except Exception as e:
-                print('chain task err')
-                update_output(f'error 4: {e}\n', output)
-            return False
-        
-        if cont:
-            cont = run_data_task('Plugin')
+        # if cont:
+        #     cont = run_chain_task('Nodes-Blocks')
+        # if cont:
+        #     cont = run_chain_task('Sonet-Blocks')
+        # if cont:
+        #     cont = run_chain_task('Accounts-Blocks')
+        # if cont:
+        #     cont = run_chain_task('Keys-Blocks')
+        # if cont:
+        #     cont = run_chain_task('User_Blocks')
         if cont:
             cont = run_data_task('Region')
+
         if cont:
-            cont = run_chain_task('Operations-Blocks')
-        if cont:
-            cont = run_chain_task('Sonet-Blocks')
-        if cont:
-            cont = run_chain_task('User_Blocks')
-        if cont and 'maintainer' in full_nodeData['settings']['node_type']:
-            operatorData['myNodes'][operatorData['local_nodeId']]['meta']['do_not_sync_block_content'] = True
-            write_remote_opData(operatorData, update_remote=True)
-            cont = run_chain_task('Wallet_Blocks')
-            del operatorData['myNodes'][operatorData['local_nodeId']]['meta']['do_not_sync_block_content']
-            operatorData['myNodes'][operatorData['local_nodeId']]['meta']['do_sync_block_content'] = True
-            write_remote_opData(operatorData, update_remote=True)
+            def build_rec(index):
+                signedRequest = json.dumps(sign({'index':index,'dt':dt_to_string(now_utc())}, operatorData=operatorData, node_keys=node_keys))
+                data = {'userData':userData, 'upkData':upkData, 'nodeData':selfNode, 'request':signedRequest}
+                response = connect_to_node(sync_node_address, 'network/build_records', data=data, operatorData=operatorData, self_nodeData=full_nodeData['nodeData'], node_setup=True, node_keys=node_keys, timeout=(20,20))
+                if response and response.status_code == 200:
+                    r_json = response.json()
+                    print('-check_latest_update r_json i',now_utc(),r_json)
+                    if r_json['message'] == 'Success':
+                        index = r_json['index']
+                        return index
+                    elif r_json['message'] == 'Done':
+                        return None
+                else:
+                    return index
+
+            update_output(f'\nUpdating Records', output)
+            index = 1
+            prev_index = {'index':index, 'count':0}
+            update_output(f'-noBreak-{index}.', output)
+            index = build_rec(index)
+            while index:
+                update_output(f'-noBreak-{index}.', output)
+                index = build_rec(index)
+                if prev_index['index'] == index:
+                    prev_index['count'] += 1
+                else:
+                    prev_index = {'index':index, 'count':0}
+                if prev_index['count'] > 10:
+                    update_output(f'-noBreak- stopping', output)
+                    cont = False
+                    index = None
+                if SetupScreen and hasattr(SetupScreen, 'abort_function') and SetupScreen.abort_function:
+                    SetupScreen.parent_screen.job_running = False
+                    cont = False
+                    index = None
+            update_output(f'\n', output)
             
+        # if cont and 'maintainer' in full_nodeData['settings']['node_type']:
+        #     operatorData['myNodes'][operatorData['local_nodeId']]['meta']['do_not_sync_block_content'] = True
+        #     write_remote_opData(operatorData, update_remote=True)
+        #     cont = run_chain_task('Wallet_Blocks')
+        #     del operatorData['myNodes'][operatorData['local_nodeId']]['meta']['do_not_sync_block_content']
+        #     operatorData['myNodes'][operatorData['local_nodeId']]['meta']['do_sync_block_content'] = True
+        #     write_remote_opData(operatorData, update_remote=True)
+            
+        if cont:
+            for genesisId in full_nodeData['meta']['chainData']['supported_plugins']:
+                print('genesisId',genesisId)
+                if SetupScreen and hasattr(SetupScreen, 'abort_function') and SetupScreen.abort_function:
+                    SetupScreen.parent_screen.job_running = False
+                    return False
+                if cont and genesisId.startswith('reg'):
+                    nodes = get_node_list(operatorData=operatorData, target=genesisId, exclude_self=True)
+                    print('nodes::',nodes)
+                    if nodes:
+                        try:
+                            cont = run_chain_task(genesisId+'-Blocks', node_list=nodes, target_node=None)
+                        except Exception as e:
+                            print('chain task err 5',str(e))
+                            update_output(f'error 5: {e}\n', output)
         if cont and 'relay' not in full_nodeData['settings']['node_type']:
             if 'chainData' in full_nodeData['meta'] and 'supported_regions' in full_nodeData['meta']['chainData'] and full_nodeData['meta']['chainData']['supported_regions'] != '':
                 update_output(f'\nUpdating region chains...\n', output)
@@ -1784,6 +1843,15 @@ def sync_database(output=None, SetupScreen=None, seed=False, total_sync=False):
                             except Exception as e:
                                 print('chain task err 4',str(e))
                                 update_output(f'error 4: {e}\n', output)
+        
+        if cont and 'maintainer' in full_nodeData['settings']['node_type']:
+            # operatorData['myNodes'][operatorData['local_nodeId']]['meta']['do_not_sync_block_content'] = True
+            # write_remote_opData(operatorData, update_remote=True)
+            cont = run_chain_task('Wallet_Blocks')
+            # del operatorData['myNodes'][operatorData['local_nodeId']]['meta']['do_not_sync_block_content']
+            # operatorData['myNodes'][operatorData['local_nodeId']]['meta']['do_sync_block_content'] = True
+            # write_remote_opData(operatorData, update_remote=True)
+
     if cont or not network_contacted:
         operatorData['syncingDB'] = False
         update_output(f'\n\nSync Complete.\n', output)
@@ -2185,7 +2253,11 @@ def get_commands(task, system=None, operatorData=None, in_full=False, extras={})
             import commands.linux.linux_purgedb as cmds
         elif task == 'restart':
             cmds = [
-                # ["raise_if_error", "sudo", "-S", f"{homepath}/Sonet/.data/env/bin/python3", f"{homepath}/Sonet/SoNodeServer/manage.py", "check"],
+                ["raise_if_error", "sudo", "-S", f"{homepath}/Sonet/.data/env/bin/python3", f"{homepath}/Sonet/SoNodeServer/manage.py", "check"],
+                ["raise_if_error", "sudo", "-S", f"{homepath}/Sonet/.data/env/bin/python3", f"{homepath}/Sonet/SoNodeServer/manage.py", "collectstatic", "--noinput"],
+                ["sudo", "-S", "supervisorctl", "status"],
+                ["sudo", "-S", "supervisorctl", "reread"],
+                ["sudo", "-S", "supervisorctl", "update"],
                 ["sudo", "-S", "supervisorctl", "reload"],
                 ["sudo", "-S", "systemctl", "daemon-reexec"],
                 ["sudo", "-S", "systemctl", "daemon-reload"],
@@ -2193,7 +2265,6 @@ def get_commands(task, system=None, operatorData=None, in_full=False, extras={})
                 ["sudo", "-S", "systemctl", "restart", "nginx"],
             ]
             return cmds, {}
-
     elif system == 'mac':
         if task == 'install':
             import commands.mac.mac_install_cmds as cmds
@@ -2215,6 +2286,7 @@ def get_commands(task, system=None, operatorData=None, in_full=False, extras={})
             cmds = [
                 
                 ["raise_if_error", f"{homepath}/Sonet/.data/env/bin/python3", f"{homepath}/Sonet/SoNodeServer/manage.py", "check"],
+                ["raise_if_error", "sudo", "-S", f"{homepath}/Sonet/.data/env/bin/python3", f"{homepath}/Sonet/SoNodeServer/manage.py", "collectstatic", "--noinput"],
                 ['sudo', '-S', 'chown', '-R', f'{username}:staff', f'/Users/{username}/Sonet/.data/logs'],
                 ['sudo', '-S', 'chown', '-R', f'{username}:staff', f'/Users/{username}/Sonet/.data/supervisor'],
                 ['/opt/homebrew/bin/supervisord', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf'],
@@ -2395,15 +2467,15 @@ def connect_to_node(ip_list, link, data={}, operatorData=None, timeout=(5,30), g
         ip_list = [ip_list]
     try:
         local_ip = fetch_secure_item('address')
-        print('local_ip:',local_ip)
         if not local_ip:
             operatorData = get_operatorData(operatorData)
             local_ip = operatorData['myNodes'][operatorData['local_nodeId']]['nodeData']['address']
+        print('local_ip:',local_ip)
         if local_ip in ip_list:
             if skip_self:
                 return None
             operatorData = get_operatorData(operatorData)
-            ip_list = [operatorData['myNodes'][operatorData['local_nodeId']]['settings']['localhost']]
+            ip_list = [f"{operatorData['myNodes'][operatorData['local_nodeId']]['settings']['local_ip']}:{operatorData['myNodes'][operatorData['local_nodeId']]['settings']['port']}"]
             print('swapped ip', ip_list)
 
     except Exception as e:
@@ -3144,7 +3216,7 @@ def fetch_remote_data(remote_data, operatorData=None, fetch_key=True, ssh_client
                 update_output(f"No data.", output)
                 return False
             remote_opData = json.loads(data_string)
-            print('remote_opData:',remote_opData)
+            # print('remote_opData:',remote_opData)
             if 'local_nodeId' in remote_opData and 'myNodes' in remote_opData and remote_opData['local_nodeId'] in remote_opData['myNodes']:
                 print('remote id:',remote_opData['local_nodeId'])
                 remote_node_data = remote_opData['myNodes'][remote_opData['local_nodeId']]

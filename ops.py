@@ -207,6 +207,7 @@ class Sidebar(BoxLayout):
     def __init__(self, parent, **kwargs):
         super(Sidebar, self).__init__(**kwargs)
         print('-Sidebar')
+
         
         operatorData = get_operatorData()
         self.size_hint_x = None  
@@ -273,8 +274,8 @@ class Sidebar(BoxLayout):
                 buttons.append('Reinstall')
             
             is_active = is_nginx_running()
-            if not is_active:
-                buttons.append('Logout')
+            # if not is_active:
+            #     buttons.append('Logout')
 
             for button_text in buttons:
                 btn = HoverButton(
@@ -349,6 +350,9 @@ class Sidebar(BoxLayout):
 
         self.scroll_view.add_widget(self.content)
         self.add_widget(self.scroll_view)
+        button_text = 'Logout'
+        btn = HoverButton(text=button_text, font_size=dp(13) * t_scale, height=dp(32) * w_scale, size_hint=(1, None), on_press=partial(parent.switch_layout, button_text))
+        self.add_widget(btn)
         from commands.utils import sonode_version_num
         version = Label(text='SoNode v' + str(sonode_version_num), size_hint=(1, None), height=dp(50) * w_scale, font_size=dp(13) * t_scale)
         self.add_widget(version)
@@ -374,6 +378,7 @@ class Sidebar(BoxLayout):
 class MonitorScreen(BoxLayout):
     def __init__(self, parent=None, **kwargs):
         super(MonitorScreen, self).__init__(**kwargs)
+        print('-MonitorScreen init')
         self.parent_screen = parent
         self.default_commands = {"Requests": "sudo -S tail -f ~/Sonet/.data/logs/gunicorn.log",'Chatter':'sudo -S tail -f ~/Sonet/.data/logs/chat_worker.log', 'High Worker':'sudo -S tail -f ~/Sonet/.data/logs/high_worker.log', 'Main Worker':'sudo -S tail -f ~/Sonet/.data/logs/main_worker.log','Low Worker':'sudo -S tail -f ~/Sonet/.data/logs/low_worker.log'}
         self.default_presets = {'Full Logs':{'local':['Status','Requests','Chatter','new_row','High Worker','Main Worker','Low Worker']},'local:workers':{'local':['High Worker', 'Main Worker','Low Worker']},'requests/chatter':['Requests','Chatter'],'All Remotes':'all_remotes'}
@@ -509,6 +514,10 @@ class MonitorScreen(BoxLayout):
             self.display_rows.add_widget(window_row)
 
         return self.create_window(row=self.window_row_count, super_func=super_func)
+
+    def quick_load(self, cmd):
+        window = self.create_new_row()
+        self.perform_action(window=window, command='run_preset', menu='commands', args=[window, cmd])
 
 
     def super_open_server(self, window, server_name):
@@ -1999,12 +2008,15 @@ class MonitorScreen(BoxLayout):
 
     def perform_action(self, window=None, command='', menu='commands', args=[]):
         print('-perform_action',command,args)
-        if menu == 'commands':
-            window.command_dropdown.dismiss()
-        elif menu == 'options':
-            window.options_dropdown.dismiss()
-        elif menu == 'servers':
-            window.server_dropdown.dismiss()
+        try:
+            if menu == 'commands':
+                window.command_dropdown.dismiss()
+            elif menu == 'options':
+                window.options_dropdown.dismiss()
+            elif menu == 'servers':
+                window.server_dropdown.dismiss()
+        except:
+            pass
         Clock.schedule_once(lambda dt: getattr(self, command)(*args), 0)
 
     def run_preset(self, window, cmd_name):
@@ -2015,10 +2027,12 @@ class MonitorScreen(BoxLayout):
             self.stop_system_info_updates(window)
             self.close_connection(window)
             if not cmd_name or cmd_name not in self.preset_commands:
+                print('p1',self.preset_commands)
                 self.update_output(window, 'Command not found\n')
                 window.command_dropdown.dismiss()
                 window.command_dropdown.open(window.commands_button)
             else:
+                print('p2')
                 # # remove current windows
                 # rows = []
                 # windows = []
@@ -2034,7 +2048,11 @@ class MonitorScreen(BoxLayout):
                 err = str(cmd_name)
                 commands_data = self.preset_commands[cmd_name]
                 err = str(commands_data)
-                commands_data = ast.literal_eval(commands_data)
+                print('commands_data',type(commands_data),commands_data)
+                try:
+                    commands_data = ast.literal_eval(commands_data)
+                except:
+                    pass
             if isinstance(commands_data, dict) or commands_data == 'all_remotes':
                 if commands_data == 'all_remotes':
                     commands_data = {}
@@ -3001,7 +3019,8 @@ class ChainsScreen(BoxLayout):
 
             for plugin in self.plugin_data:
                 print('\nplugin',plugin)
-                self.plugins_root.add_node(CheckBoxTreeLabel(text=plugin['Title'], identifier=plugin['id'], obj_type='Plugin', active=self.get_active_state(plugin['id']), parent=self, superuser=self.superuser, new_child_btn=False))
+                self.plugins_root.add_node(CheckBoxTreeLabel(text=plugin['Title'], identifier=plugin['id'], obj_type='Plugin', active='mandatory', parent=self, superuser=self.superuser, new_child_btn=False))
+                # self.plugins_root.add_node(CheckBoxTreeLabel(text=plugin['Title'], identifier=plugin['id'], obj_type='Plugin', active=self.get_active_state(plugin['id']), parent=self, superuser=self.superuser, new_child_btn=False))
                 
             self.regions_root = DynamicTreeView(root_options=dict(text='Regions', is_open=True), hide_root=False, size_hint=(1, None))
             # self.regions_root.is_open = True
@@ -3322,7 +3341,7 @@ class ChainsScreen(BoxLayout):
             if isinstance(node, CheckBoxTreeLabel):
                 print('node.identifier',node.identifier)
                 print('node.extra',node.extra)
-                if node.extra:
+                if node.checkbox.active and node.extra:
                     reqs[node.identifier] = {'title':node.title,'reqs':node.extra}
             chains, checked_regions, checked_plugins, unchecked_items, half_checked_items = sort_checkboxes(node, chains, checked_regions, checked_plugins, unchecked_items, half_checked_items)
 
@@ -3635,10 +3654,9 @@ class NodesScreen(BoxLayout):
                     else: 
                         self.content.add_widget(FieldRow(node_id, commands, is_button_list=True))
                 if len(node_list) > 1:
-                    commands = [{'title':"Update All",'action':partial(self.run_node_sequence, 'update')}]
-                    self.content.add_widget(FieldRow('', commands, is_button_list=True))
-                if len(node_list) > 1:
-                    commands = [{'title':"Restart All",'action':partial(self.run_node_sequence, 'restart')}]
+                    commands = [{'title':"Monitor All",'action':partial(self.switch_to_monitor)},
+                        {'title':"Update All",'action':partial(self.run_node_sequence, 'update')},
+                        {'title':"Restart All",'action':partial(self.run_node_sequence, 'restart')}]
                     self.content.add_widget(FieldRow('', commands, is_button_list=True))
   
             else:
@@ -3838,6 +3856,9 @@ class NodesScreen(BoxLayout):
     def remove_node(self, node_id):
         try:
             del self.operatorData['myNodes'][node_id]
+            for remote in self.operatorData['myRemotes'].copy():
+                if self.operatorData['myRemotes'][remote].get('node_id', False) == node_id:
+                    del self.operatorData['myRemotes'][remote]['node_id']
             write_operatorData(self.operatorData)
             text = 'Removed'
         except Exception as e:
@@ -4107,47 +4128,61 @@ class NodesScreen(BoxLayout):
         self.scroll_view.add_widget(self.content)
         self.add_widget(self.scroll_view)
         Clock.schedule_once(lambda dt, line=self: self.run_node_sequence_step2())
+        # threading.Thread(target=self.run_node_sequence_step2).start()
 
     def run_node_sequence_step2(self):
-        print(-'run_node_sequence_step2')
+        print('-run_node_sequence_step2')
         self.completed_nodes = []
+        self.starting_node = self.operatorData['selected_node']
         for node_id, data in self.operatorData['myNodes'].items():
             print('node_id',node_id)
-            self.completed_nodes.append(node_id)
-            self.select_node(node_id=node_id, fetch_remote=False)
-            # send_manager_to_remote(node_id)
-            self.parent_screen.node_screen = self.parent_screen.display_layout
+            if not value_is_none(data['nodeData']['activated_dt']):
+                self.completed_nodes.append(node_id)
+                self.select_node(node_id=node_id, fetch_remote=False)
+                # send_manager_to_remote(node_id)
+                self.parent_screen.node_screen = self.parent_screen.display_layout
 
-            try:
-                self.parent_screen.display_layout.remove_widget(self.parent_screen.display_layout.scroll_view)
-                self.parent_screen.main_layout.remove_widget(self.parent_screen.display_layout)
-            except:
-                pass
-            self.parent_screen.display_layout = SetupScreen(parent=self.parent_screen, option=self.cmd, following_cmd=self.update_node, orientation='vertical', size_hint=(1, 1))
-            self.parent_screen.display_layout.activate_display()
-            self.parent_screen.main_layout.add_widget(self.parent_screen.display_layout)
-            break
+                try:
+                    self.parent_screen.display_layout.remove_widget(self.parent_screen.display_layout.scroll_view)
+                    self.parent_screen.main_layout.remove_widget(self.parent_screen.display_layout)
+                except:
+                    pass
+                self.parent_screen.display_layout = SetupScreen(parent=self.parent_screen, option=self.cmd, following_cmd=self.update_node, orientation='vertical', size_hint=(1, 1))
+                self.parent_screen.display_layout.activate_display()
+                self.parent_screen.main_layout.add_widget(self.parent_screen.display_layout)
+                break
     
     def update_node(self):
         print('-self.update_node')
         for node_id, data in self.operatorData['myNodes'].items():
             print('node_id',node_id, data['meta'].get('os', None),"self.completed_nodes",self.completed_nodes)
-            if data['meta'].get('os', None) and data['meta'].get('os') == 'Linux':
-                if node_id not in self.completed_nodes and 'nodeData' in data and 'id' in data['nodeData']:
-                    self.completed_nodes.append(node_id)
-                    self.select_node(node_id=node_id, fetch_remote=False)
+            if not value_is_none(data['nodeData']['activated_dt']):
+                if data['meta'].get('os', None) and data['meta'].get('os') == 'Linux':
+                    if node_id not in self.completed_nodes and 'nodeData' in data and 'id' in data['nodeData']:
+                        self.completed_nodes.append(node_id)
+                        self.select_node(node_id=node_id, fetch_remote=False)
 
-                    if self.cmd == 'update':
-                        Clock.schedule_once(lambda dt, line=self: self.parent_screen.display_layout.run_update(new_text_screen=False, operatorData=self.operatorData))
-                    elif self.cmd == 'restart':
-                        Clock.schedule_once(lambda dt, line=self: self.parent_screen.display_layout.run_restart(new_text_screen=False, operatorData=self.operatorData))
-                    return
-        
+                        if self.cmd == 'update':
+                            Clock.schedule_once(lambda dt, line=self: self.parent_screen.display_layout.run_update(new_text_screen=False, operatorData=self.operatorData))
+                        elif self.cmd == 'restart':
+                            Clock.schedule_once(lambda dt, line=self: self.parent_screen.display_layout.run_restart(new_text_screen=False, operatorData=self.operatorData))
+                        return
+        self.select_node(node_id=self.starting_node, fetch_remote=False)
         self.parent_screen.node_screen = None
         try:
             self.parent_screen.display_layout.text_input.text += '\n\nAll node updates complete.\n\n'
         except Exception as e:
             print('display_layout.text_input err',str(e))
+
+    def switch_to_monitor(self):
+        try:
+            self.parent_screen.display_layout.remove_widget(self.parent_screen.display_layout.scroll_view)
+            self.parent_screen.main_layout.remove_widget(self.parent_screen.display_layout)
+        except:
+            pass
+        self.parent_screen.display_layout = MonitorScreen(parent=self.parent_screen, orientation='vertical', size_hint=(1, 1))
+        self.parent_screen.display_layout.quick_load('All Remotes')
+        self.parent_screen.main_layout.add_widget(self.parent_screen.display_layout)
 
     def update_rect(self, *args):
         self.rect.size = self.size
@@ -5038,6 +5073,7 @@ class SetupScreen(BoxLayout):
                         '''Other devices will see the IP address of this node if you are not running a VPN''',
                         '''Only use quick install if you have previously used quick uninstall''',
                         '''After setup is complete and you activate this node a connection will be established with peer nodes and relevant data up to this point will be downloaded. This node will then be open to serving data and receiving rewards.''',
+                        '''The install could take 20+ minutes and may appear to freeze at times. Give it a chance to finish before restarting.'''
                     ]
                     if 'debug' in self.operatorData and self.operatorData['debug']:
                         texts.append('''\n*Notice*\nYou have debug activated, requirements will not be installed while in this state.\nTurn off debug in settings or continue.''')
@@ -5984,7 +6020,7 @@ class SetupScreen(BoxLayout):
         print('-run_install')
         self.parent_screen.job_running = True
         if self.remote_data:
-            self.text_input.text = f'Installing on {self.remote_data["nickname"]} ({device_system})...\n\n'
+            self.text_input.text = f'Installing on {self.remote_data["nickname"]} ({self.remote_data["os_type"]})...\n\n'
         else:
             self.text_input.text = f'Installing on {device_system}...\n\n'
         try:
@@ -7649,13 +7685,14 @@ class SetupScreen(BoxLayout):
         else:
             self.host = 'remote'
             self.remote_data = get_remote(node_id=self.operatorData['selected_node'], operatorData=self.operatorData)
-            self.context = {'fetch_cmds': False, 'task': 'activate', 'extras': {'enableTasker': self.enableTasker, 'debug': self.debug}}
+            self.context = {'fetch_cmds': False, 'task': 'uninstall', 'extras': {'enableTasker': self.enableTasker, 'debug': self.debug}}
 
             connected, self = make_remote_connection(remote_data=self.remote_data, cls=self)
             if not connected:
                 Clock.schedule_once(lambda dt, line='\nFailed remote contact 1.\n': self.update_text(line))
                 return
             self.commands, self.special_commands = fetch_remote_commands(self.context["task"], self.ssh_client, extras=self.context["extras"])
+            print("run_uninstall commands:'",self.commands)
 
         upk_deactivated = True
         from commands.utils import get_or_create_node_obj, get_remote_opData, value_is_none
@@ -7721,9 +7758,14 @@ class SetupScreen(BoxLayout):
         channel = self.stdout.channel
         last_data_time = time.time()
         while True:
-            if time.time() - last_data_time > 150:
-                print("Timeout: command produced no output for 2.5 mins")
-                break
+            if time.time() - last_data_time > 600:
+                txt = "Timeout: command produced no output for 10 mins"
+                print(txt)
+                Clock.schedule_once(
+                    lambda dt, l=f"{txt}": self.update_text(l)
+                )
+                raise RuntimeError(txt)
+                # break
 
             if channel.recv_ready() or channel.recv_stderr_ready():
                 last_data_time = time.time()
@@ -8357,9 +8399,14 @@ class CommandRunner:
         last_data_time = time.time()
 
         while True:
-            if time.time() - last_data_time > 150:
-                print("Timeout: command produced no output for 2.5 mins")
-                break
+            if time.time() - last_data_time > 600:
+                txt = "Timeout: command produced no output for 10 mins"
+                print(txt)
+                Clock.schedule_once(
+                    lambda dt, l=f"{txt}": self.update_text(l)
+                )
+                raise RuntimeError(txt)
+                # break
 
             if channel.recv_ready() or channel.recv_stderr_ready():
                 last_data_time = time.time()
@@ -8465,7 +8512,7 @@ class CommandRunner:
                     if 'raise' in output or 'RuntimeError' in output:
                         raise RuntimeError("Updater halted due to remote command failure")
 
-            time.sleep(0.02)
+            time.sleep(0.025)
 
         self.run_commands()
 
@@ -8490,6 +8537,7 @@ class CommandRunner:
     
     def clean_output(self, output):
         txt = re.sub(r'[^\x09\x0A\x20-\x7E]', '', output)
+        txt = txt[:1000]
         return txt.strip("\n")
         
     def should_auto_confirm(self, text):

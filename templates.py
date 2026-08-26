@@ -669,7 +669,7 @@ class CheckBoxTreeLabel(BoxLayout, TreeViewNode):
             self.add_widget(self.checkbox)
         else:
             self.checkbox = CustomCheckBox(size_hint=(None, None), height=dp(15)* w_scale, identifier=x, active=active)
-            self.checkbox.bind(active=self.on_checkbox_active)
+            # self.checkbox.bind(active=self.on_checkbox_active)
             self.add_widget(self.checkbox)
 
         self.label = Label(text=text, valign='middle', halign='left', size_hint_x=None)
