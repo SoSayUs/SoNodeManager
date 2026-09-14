@@ -1043,20 +1043,20 @@ def declare_self_active(activate, output=None, operatorData=None, wait_for_reloa
                                 full_nodeData['nodeData']['onion'] = onion_address
 
                                 system = platform.system()
-                                try:
-                                    if system == "Linux":
-                                        full_nodeData['nodeData']['hardware_data']['os'] = 'Linux'
-                                    elif system == "Darwin":
-                                        full_nodeData['nodeData']['hardware_data']['os'] = 'MacOS'
-                                    elif system == "Windows":
-                                        full_nodeData['nodeData']['hardware_data']['os'] = 'Windows'
-                                    if 'os' not in full_nodeData['meta']:
-                                        full_nodeData['meta']['os'] = full_nodeData['nodeData']['hardware_data']['os']
-                                        operatorData['myNodes'][full_nodeData['nodeData']['id']] = full_nodeData
-                                        prnt("full_nodeData['meta']['hardware_results']",full_nodeData['meta']['hardware_results'])
-                                        full_nodeData['nodeData']['hardware_data']['results'] = full_nodeData['meta']['hardware_results']
-                                except:
-                                    pass
+                                # try:
+                                #     if system == "Linux":
+                                #         full_nodeData['nodeData']['hardware_data']['os'] = 'Linux'
+                                #     elif system == "Darwin":
+                                #         full_nodeData['nodeData']['hardware_data']['os'] = 'MacOS'
+                                #     elif system == "Windows":
+                                #         full_nodeData['nodeData']['hardware_data']['os'] = 'Windows'
+                                #     if 'os' not in full_nodeData['meta']:
+                                #         full_nodeData['meta']['os'] = full_nodeData['nodeData']['hardware_data']['os']
+                                #         # operatorData['myNodes'][full_nodeData['nodeData']['id']] = full_nodeData
+                                #         # print("full_nodeData['meta']['hardware_results']",full_nodeData['meta']['hardware_results'])
+                                #         # full_nodeData['nodeData']['hardware_data']['results'] = full_nodeData['meta']['hardware_results']
+                                # except:
+                                #     pass
 
                                 if 'abilities' in operatorData:
                                     full_nodeData['nodeData']['abilities'] = operatorData['abilities']
@@ -4031,7 +4031,11 @@ def run_hardware_test(remote_cmd=None, output=None, node_data=None, operatorData
     results['UPLOAD'] = f"{upload_mbps:.1f} Mbps"
 
     print("results",results)
-    node_data['meta']['hardware_results'] = results
+    # node_data['meta']['hardware_results'] = results
+
+    # operatorData['myNodes'][full_nodeData['nodeData']['id']] = full_nodeData
+    # print("full_nodeData['meta']['hardware_results']",full_nodeData['meta']['hardware_results'])
+    node_data['nodeData']['hardware_data']['results'] = results
 
     if not dl_passed:
         passed = False
