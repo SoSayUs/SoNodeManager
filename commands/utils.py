@@ -240,13 +240,16 @@ def is_id(obj):
     return False
 
 def string_to_dt(dt_str):
-    if isinstance(dt_str, datetime.datetime):
-        return dt_str
-    if dt_str and isinstance(dt_str, str):
-        if 'Z' in dt_str:
-            dt = datetime.datetime.fromisoformat(dt_str.replace('Z', '0+00:00'))
-            return dt
-        return datetime.datetime.fromisoformat(dt_str)
+    try:
+        if isinstance(dt_str, datetime.datetime):
+            return dt_str
+        if dt_str and isinstance(dt_str, str):
+            if 'Z' in dt_str:
+                dt = datetime.datetime.fromisoformat(dt_str.replace('Z', '0+00:00'))
+                return dt
+            return datetime.datetime.fromisoformat(dt_str)
+    except:
+        pass
     return None
 
 def update_output(line, output):
