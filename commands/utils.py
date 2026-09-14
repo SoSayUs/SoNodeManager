@@ -943,6 +943,7 @@ def declare_self_active(activate, output=None, operatorData=None, wait_for_reloa
         if output:
             update_output(f'\nEstablishing connection...\n', output)
 
+        print("full_nodeData['nodeData']",full_nodeData['nodeData'])
         broadcast_json = None
         if full_nodeData['nodeData']['node_level'] == 'super':
             # temp_keys = fetch_secure_item('temp_keys')
