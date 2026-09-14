@@ -459,8 +459,9 @@ def sign(data, privKey=None, pubKey=None, node_keys={}, clear_signed=True, opera
     if remove_skip_fields:
         data = {key:data[key] for key in data if key not in skip_sign_fields}
     copied_data = data.copy()
-    print('copied_data',copied_data)
+    print('\n\ncopied_data',copied_data)
     sorted_data = sort_for_sign(copied_data)
+    print('\n\sorted_data',sorted_data)
 
     x_data = sorted_data.copy()
     json_data = json.dumps(x_data, separators=(',', ':'))
@@ -509,6 +510,7 @@ def sort_for_sign(data, print_data=False):
         return val
 
     def process_value(val):
+        print('process_value',val)
         if isinstance(val, dict):
             return sort_for_sign(val, print_data)
         elif isinstance(val, list):
@@ -526,6 +528,7 @@ def sort_for_sign(data, print_data=False):
         try:
             from dateutil.parser import parse
             parse(val)
+            print('is_iso_datetime True',val)
             return True
         except Exception:
             return False
