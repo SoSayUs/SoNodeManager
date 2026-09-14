@@ -8296,6 +8296,17 @@ class CommandRunner:
                                     shell=True
                                 )
                             else:
+                                # self.master_fd, slave_fd = pty.openpty()
+                                # self.current_process = subprocess.Popen(
+                                #     command,
+                                #     stdin=slave_fd,
+                                #     stdout=slave_fd,
+                                #     stderr=slave_fd,
+                                #     text=True
+                                # )
+                                # os.close(slave_fd)
+
+
                                 self.master_fd, slave_fd = pty.openpty()
                                 self.current_process = subprocess.Popen(
                                     command,
@@ -8305,6 +8316,10 @@ class CommandRunner:
                                     text=True
                                 )
                                 os.close(slave_fd)
+
+                            if 'sudo' in command:
+                                pw = self.systemPass or self.remote_data["password"]
+                                os.write(self.master_fd, (pw + "\n").encode())
 
                             self.current_process.wait()
                             rc = self.current_process.returncode
