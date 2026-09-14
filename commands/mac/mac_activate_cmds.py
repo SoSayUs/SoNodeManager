@@ -86,6 +86,8 @@ def hardware_check(output=None, remote_cmd=False):
     if not result:
         raise Exception('Failed hardware check')
     else:
+        print('node_id',node_id)
+        print('node_data:::',node_data)
         operatorData['myNodes'][node_id] = node_data
         write_operatorData(operatorData)
 
