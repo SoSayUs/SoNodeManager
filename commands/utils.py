@@ -1053,7 +1053,7 @@ def declare_self_active(activate, output=None, operatorData=None, wait_for_reloa
                                     if 'os' not in full_nodeData['meta']:
                                         full_nodeData['meta']['os'] = full_nodeData['nodeData']['hardware_data']['os']
                                         operatorData['myNodes'][full_nodeData['nodeData']['id']] = full_nodeData
-
+                                        prnt("full_nodeData['meta']['hardware_results']",full_nodeData['meta']['hardware_results'])
                                         full_nodeData['nodeData']['hardware_data']['results'] = full_nodeData['meta']['hardware_results']
                                 except:
                                     pass
