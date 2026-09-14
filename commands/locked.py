@@ -526,10 +526,10 @@ def sort_for_sign(data, print_data=False):
         if not isinstance(val, str):
             return False
         try:
-            from dateutil.parser import parse
-            parse(val)
+            from commands.utils import string_to_dt
+            x = string_to_dt(val)
             print('is_iso_datetime True',val)
-            return True
+            return True if x else False
         except Exception:
             return False
 
