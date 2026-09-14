@@ -1767,125 +1767,125 @@ def sync_database(output=None, SetupScreen=None, seed=False, total_sync=False):
         rva = connect_to_node(sync_node_address, 'utils/remove_false_blocks', data=data, operatorData=operatorData, self_nodeData=full_nodeData['nodeData'], node_setup=True, node_keys=node_keys)
 
         cont = run_data_task('Users-Keys')
-        # if cont:
-        #     network_contacted = True
-        #     cont = run_data_task('Sonet')
-        # if cont:
-        #     cont = run_data_task('Node', check_for_latest=False)
-        # if cont:
-        #     cont = run_data_task('Plugin')
+        if cont:
+            network_contacted = True
+            cont = run_data_task('Sonet')
+        if cont:
+            cont = run_data_task('Node', check_for_latest=False)
+        if cont:
+            cont = run_data_task('Plugin')
                         
-        # if 'node_type' not in full_nodeData['settings']:
-        #     full_nodeData['settings']['node_type'] = 'auto'
-        # if 'start_local_install' in operatorData:
-        #     del operatorData['start_local_install']
-        #     write_remote_opData(operatorData, update_remote=True)
+        if 'node_type' not in full_nodeData['settings']:
+            full_nodeData['settings']['node_type'] = 'auto'
+        if 'start_local_install' in operatorData:
+            del operatorData['start_local_install']
+            write_remote_opData(operatorData, update_remote=True)
         
-        # if cont:
-        #     cont = run_chain_task('Nodes-Blocks')
-        # if cont:
-        #     cont = run_chain_task('Sonet-Blocks')
-        # if cont:
-        #     cont = run_chain_task('Accounts-Blocks')
-        # if cont:
-        #     cont = run_chain_task('Keys-Blocks')
-        # if cont:
-        #     cont = run_chain_task('User_Blocks')
-        # if cont:
-        #     cont = run_data_task('Region')
+        if cont:
+            cont = run_chain_task('Nodes-Blocks')
+        if cont:
+            cont = run_chain_task('Sonet-Blocks')
+        if cont:
+            cont = run_chain_task('Accounts-Blocks')
+        if cont:
+            cont = run_chain_task('Keys-Blocks')
+        if cont:
+            cont = run_chain_task('User_Blocks')
+        if cont:
+            cont = run_data_task('Region')
 
-        # if cont:
-        #     def build_rec(index):
-        #         signedRequest = json.dumps(sign({'index':index,'dt':dt_to_string(now_utc())}, operatorData=operatorData, node_keys=node_keys))
-        #         data = {'userData':userData, 'upkData':upkData, 'nodeData':selfNode, 'request':signedRequest}
-        #         response = connect_to_node(sync_node_address, 'network/build_records', data=data, operatorData=operatorData, self_nodeData=full_nodeData['nodeData'], node_setup=True, node_keys=node_keys, timeout=(20,20))
-        #         if response and response.status_code == 200:
-        #             r_json = response.json()
-        #             print('-check_latest_update r_json i',now_utc(),r_json)
-        #             if r_json['message'] == 'Success':
-        #                 index = r_json['index']
-        #                 return index
-        #             elif r_json['message'] == 'Done':
-        #                 return None
-        #         else:
-        #             return index
+        if cont:
+            def build_rec(index):
+                signedRequest = json.dumps(sign({'index':index,'dt':dt_to_string(now_utc())}, operatorData=operatorData, node_keys=node_keys))
+                data = {'userData':userData, 'upkData':upkData, 'nodeData':selfNode, 'request':signedRequest}
+                response = connect_to_node(sync_node_address, 'network/build_records', data=data, operatorData=operatorData, self_nodeData=full_nodeData['nodeData'], node_setup=True, node_keys=node_keys, timeout=(20,20))
+                if response and response.status_code == 200:
+                    r_json = response.json()
+                    print('-check_latest_update r_json i',now_utc(),r_json)
+                    if r_json['message'] == 'Success':
+                        index = r_json['index']
+                        return index
+                    elif r_json['message'] == 'Done':
+                        return None
+                else:
+                    return index
 
-        #     update_output(f'\nUpdating Records', output)
-        #     index = 1
-        #     prev_index = {'index':index, 'count':0}
-        #     update_output(f'-noBreak-{index}.', output)
-        #     index = build_rec(index)
-        #     while index:
-        #         update_output(f'-noBreak-{index}.', output)
-        #         index = build_rec(index)
-        #         if prev_index['index'] == index:
-        #             prev_index['count'] += 1
-        #         else:
-        #             prev_index = {'index':index, 'count':0}
-        #         if prev_index['count'] > 10:
-        #             update_output(f'-noBreak- stopping', output)
-        #             cont = False
-        #             index = None
-        #         if SetupScreen and hasattr(SetupScreen, 'abort_function') and SetupScreen.abort_function:
-        #             SetupScreen.parent_screen.job_running = False
-        #             cont = False
-        #             index = None
-        #     update_output(f'\n', output)
+            update_output(f'\nUpdating Records', output)
+            index = 1
+            prev_index = {'index':index, 'count':0}
+            update_output(f'-noBreak-{index}.', output)
+            index = build_rec(index)
+            while index:
+                update_output(f'-noBreak-{index}.', output)
+                index = build_rec(index)
+                if prev_index['index'] == index:
+                    prev_index['count'] += 1
+                else:
+                    prev_index = {'index':index, 'count':0}
+                if prev_index['count'] > 10:
+                    update_output(f'-noBreak- stopping', output)
+                    cont = False
+                    index = None
+                if SetupScreen and hasattr(SetupScreen, 'abort_function') and SetupScreen.abort_function:
+                    SetupScreen.parent_screen.job_running = False
+                    cont = False
+                    index = None
+            update_output(f'\n', output)
             
-        # # if cont and 'maintainer' in full_nodeData['settings']['node_type']:
-        # #     operatorData['myNodes'][operatorData['local_nodeId']]['meta']['do_not_sync_block_content'] = True
-        # #     write_remote_opData(operatorData, update_remote=True)
-        # #     cont = run_chain_task('Wallet_Blocks')
-        # #     del operatorData['myNodes'][operatorData['local_nodeId']]['meta']['do_not_sync_block_content']
-        # #     operatorData['myNodes'][operatorData['local_nodeId']]['meta']['do_sync_block_content'] = True
-        # #     write_remote_opData(operatorData, update_remote=True)
-            
-        # if cont:
-        #     for genesisId in full_nodeData['meta']['chainData']['supported_plugins']:
-        #         print('genesisId',genesisId)
-        #         if SetupScreen and hasattr(SetupScreen, 'abort_function') and SetupScreen.abort_function:
-        #             SetupScreen.parent_screen.job_running = False
-        #             return False
-        #         if cont and genesisId.startswith('reg'):
-        #             # nodes = get_node_list(operatorData=operatorData, target=genesisId, exclude_self=True)
-        #             nodes, operatorData, network_contacted = get_node_list(operatorData=operatorData, target=genesisId, self_node=fullNode_data, refresh_list=True, return_refresh_result=True, exclude_self=True)
-        #             print('nodes::',nodes)
-        #             if nodes:
-        #                 try:
-        #                     cont = run_chain_task(genesisId+'-Blocks', node_list=nodes, target_node=None)
-        #                 except Exception as e:
-        #                     print('chain task err 5',str(e))
-        #                     update_output(f'error 5: {e}\n', output)
-        # if cont and 'relay' not in full_nodeData['settings']['node_type']:
-        #     if 'chainData' in full_nodeData['meta'] and 'supported_regions' in full_nodeData['meta']['chainData'] and full_nodeData['meta']['chainData']['supported_regions'] != '':
-        #         update_output(f'\nUpdating region chains...\n', output)
-        #         for genesisId in full_nodeData['meta']['chainData']['supported_regions']:
-        #             print('genesisId',genesisId)
-        #             if SetupScreen and hasattr(SetupScreen, 'abort_function') and SetupScreen.abort_function:
-        #                 SetupScreen.parent_screen.job_running = False
-        #                 return False
-        #             if cont and genesisId.startswith('reg'):
-        #                 # nodes = get_node_list(operatorData=operatorData, target=genesisId, exclude_self=True)
-        #                 nodes, operatorData, network_contacted = get_node_list(operatorData=operatorData, target=genesisId, self_node=fullNode_data, refresh_list=True, return_refresh_result=True, exclude_self=True)
-        #                 print('nodes:::',nodes)
-        #                 if nodes:
-        #                     try:
-        #                         cont = run_chain_task(genesisId+'-Blocks', node_list=nodes, target_node=None)
-        #                     except Exception as e:
-        #                         print('chain task err 4',str(e))
-        #                         update_output(f'error 4: {e}\n', output)
-        
         # if cont and 'maintainer' in full_nodeData['settings']['node_type']:
+        #     operatorData['myNodes'][operatorData['local_nodeId']]['meta']['do_not_sync_block_content'] = True
+        #     write_remote_opData(operatorData, update_remote=True)
+        #     cont = run_chain_task('Wallet_Blocks')
+        #     del operatorData['myNodes'][operatorData['local_nodeId']]['meta']['do_not_sync_block_content']
+        #     operatorData['myNodes'][operatorData['local_nodeId']]['meta']['do_sync_block_content'] = True
+        #     write_remote_opData(operatorData, update_remote=True)
+            
+        if cont:
+            for genesisId in full_nodeData['meta']['chainData']['supported_plugins']:
+                print('genesisId',genesisId)
+                if SetupScreen and hasattr(SetupScreen, 'abort_function') and SetupScreen.abort_function:
+                    SetupScreen.parent_screen.job_running = False
+                    return False
+                if cont and genesisId.startswith('reg'):
+                    # nodes = get_node_list(operatorData=operatorData, target=genesisId, exclude_self=True)
+                    nodes, operatorData, network_contacted = get_node_list(operatorData=operatorData, target=genesisId, self_node=fullNode_data, refresh_list=True, return_refresh_result=True, exclude_self=True)
+                    print('nodes::',nodes)
+                    if nodes:
+                        try:
+                            cont = run_chain_task(genesisId+'-Blocks', node_list=nodes, target_node=None)
+                        except Exception as e:
+                            print('chain task err 5',str(e))
+                            update_output(f'error 5: {e}\n', output)
+        if cont and 'relay' not in full_nodeData['settings']['node_type']:
+            if 'chainData' in full_nodeData['meta'] and 'supported_regions' in full_nodeData['meta']['chainData'] and full_nodeData['meta']['chainData']['supported_regions'] != '':
+                update_output(f'\nUpdating region chains...\n', output)
+                for genesisId in full_nodeData['meta']['chainData']['supported_regions']:
+                    print('genesisId',genesisId)
+                    if SetupScreen and hasattr(SetupScreen, 'abort_function') and SetupScreen.abort_function:
+                        SetupScreen.parent_screen.job_running = False
+                        return False
+                    if cont and genesisId.startswith('reg'):
+                        # nodes = get_node_list(operatorData=operatorData, target=genesisId, exclude_self=True)
+                        nodes, operatorData, network_contacted = get_node_list(operatorData=operatorData, target=genesisId, self_node=fullNode_data, refresh_list=True, return_refresh_result=True, exclude_self=True)
+                        print('nodes:::',nodes)
+                        if nodes:
+                            try:
+                                cont = run_chain_task(genesisId+'-Blocks', node_list=nodes, target_node=None)
+                            except Exception as e:
+                                print('chain task err 4',str(e))
+                                update_output(f'error 4: {e}\n', output)
+        
+        if cont and 'maintainer' in full_nodeData['settings']['node_type']:
 
-        #     if cont:
-        #         cont = run_data_task('Wallet')
-        #     # operatorData['myNodes'][operatorData['local_nodeId']]['meta']['do_not_sync_block_content'] = True
-        #     # write_remote_opData(operatorData, update_remote=True)
-        #     if cont:
-        #         cont = run_chain_task('Wallet_Blocks')
-        #     # del operatorData['myNodes'][operatorData['local_nodeId']]['meta']['do_not_sync_block_content']
-        #     # operatorData['myNodes'][operatorData['local_nodeId']]['meta']['do_sync_block_content'] = True
-        #     # write_remote_opData(operatorData, update_remote=True)
+            if cont:
+                cont = run_data_task('Wallet')
+            # operatorData['myNodes'][operatorData['local_nodeId']]['meta']['do_not_sync_block_content'] = True
+            # write_remote_opData(operatorData, update_remote=True)
+            if cont:
+                cont = run_chain_task('Wallet_Blocks')
+            # del operatorData['myNodes'][operatorData['local_nodeId']]['meta']['do_not_sync_block_content']
+            # operatorData['myNodes'][operatorData['local_nodeId']]['meta']['do_sync_block_content'] = True
+            # write_remote_opData(operatorData, update_remote=True)
 
     if cont or not network_contacted:
         operatorData['syncingDB'] = False
