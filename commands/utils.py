@@ -872,6 +872,7 @@ def declare_self_active(activate, output=None, operatorData=None, wait_for_reloa
         custom_timeout = (4,10)
     user_id = operatorData['user_id']
     full_nodeData, is_new = get_or_create_node_obj(operatorData)
+    print('starting nodeData the first',full_nodeData)
     if activate and not is_new:
         result, updated = update_node_data()
         print('result::',result)
@@ -3736,7 +3737,7 @@ def check(label: str, passed: bool, detail: str, spec=True, output=None) -> bool
     status = "PASS" if passed else "FAIL"
     print(f"  {status}  {label:<22} {detail}")
     update_output(f"  {status}  {label:<22} {detail}", output)
-    update_output(f"  {spec}", output)
+    # update_output(f"  {spec}", output)
     return str(spec) if passed else False
 
 def check_bitness(output=None) -> bool:
@@ -3990,7 +3991,6 @@ def run_hardware_test(remote_cmd=None, output=None, node_data=None, operatorData
     if not x:
         passed = False
     results['FREQ_GHZ'] = x
-    update_output(f"check_cpu_freq: {x}", output)
 
     x = check_ram(MIN_RAM_GB, output=output)
     if not x:
