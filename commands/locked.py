@@ -422,7 +422,7 @@ def verify(data, public_key, signature=None, key_type=None, skip_sort=False):
 
 def sign(data, privKey=None, pubKey=None, node_keys={}, clear_signed=True, operatorData=None, nodeId=None, verify_result=False, bypass_last_updated_dt=False, remove_skip_fields=False):
     print('-sign',str(privKey)[:150],str(pubKey)[:150])
-    # print('data',data)
+    print('data',data)
     from .utils import get_operatorData, now_utc, fetch_node_keys, hash_upk_id, is_id
     if not pubKey or not privKey:
         if not node_keys:
@@ -459,6 +459,7 @@ def sign(data, privKey=None, pubKey=None, node_keys={}, clear_signed=True, opera
     if remove_skip_fields:
         data = {key:data[key] for key in data if key not in skip_sign_fields}
     copied_data = data.copy()
+    print('copied_data',copied_data)
     sorted_data = sort_for_sign(copied_data)
 
     x_data = sorted_data.copy()
