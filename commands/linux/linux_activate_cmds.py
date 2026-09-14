@@ -326,6 +326,7 @@ action_cmds = [
     ["sudo", "-S", 'semanage', 'fcontext', '-a', '-t', 'httpd_config_t', f"/etc/nginx/sites-available/sonode"],
     ["sudo", "-S", "semanage", "port", "-m", "-t", "http_port_t", "-p", "tcp", port], # only needed on fedora if port has changed
     ["sudo", "-S", 'restorecon', '-v', f"/etc/nginx/sites-available/sonode"],
+    ["pkill", "-9", "-f", "'rqworker'"],
     ['sudo', '-S', 'systemctl', 'start', 'redis'],
     ["sudo", "-S", "supervisorctl", "reread"],
     ["sudo", "-S", "supervisorctl", "update"],

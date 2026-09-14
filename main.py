@@ -214,8 +214,10 @@ class SplashScreen(Screen):
                             privKey = keyPair_accnt[0]
                             pubKey = keyPair_accnt[1]
                             upkData = None
+                            print("hash_upk_id(pubKey)",hash_upk_id(pubKey))
                             for upk in upks:
                                 upk = json.loads(upk)
+                                print('upk',upk['id'])
                                 if upk['id'] == hash_upk_id(pubKey):
                                     upkData = upk
                                     break

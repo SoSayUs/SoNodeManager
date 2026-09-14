@@ -63,6 +63,30 @@ w_scale = max(1.15 if Window.width < 1200 else 1.0, raw)
 t_scale = max(1.15 if Window.width < 1200 else 1.0, raw)
 
 
+import json
+from pathlib import Path
+filename = Path.home() / "Sonet" / ".data" / "settings.json"
+
+if filename.exists():
+    with filename.open("r", encoding="utf-8") as f:
+        settings_data = json.load(f)
+        if not settings_data.get('magnification', None):
+            settings_data['magnification'] = w_scale
+            settings_data['font_adjustment'] = t_scale
+            with open(filename, "w", encoding="utf-8") as f:
+                json.dump(settings_data, f, indent=4)
+        else:
+            w_scale = float(settings_data.get('magnification', w_scale))
+            t_scale = float(settings_data.get('font_adjustment', t_scale))
+else:
+    settings_data = {"branch": "main", "update at boot": True, 'magnification':w_scale, 'font_adjustment':t_scale}
+    with open(filename, "w", encoding="utf-8") as f:
+        json.dump(settings_data, f, indent=4)
+print('w_scale1',w_scale)
+print('t_scale1',t_scale)
+        
+
+
 device_system = get_device_system()
 display_max_size = 0 # number of lines in readout panel
 # display_max_size = 1000 # number of lines in readout panel
@@ -70,16 +94,16 @@ display_max_size = 0 # number of lines in readout panel
 dark_blue = Color(0.094, 0.122, 0.176, 1)
 dark_blue2 = (0.094, 0.122, 0.176, 1)
 
-try:
-    operatorData = get_operatorData()
-    w_scale = operatorData.get('magnification', 1)
-    print('w_scale1',w_scale)
-    t_scale = operatorData.get('font_adjustment', 1)
-    print('t_scale1',t_scale)
-except Exception as e:
-    print('scale err',str(e))
-    w_scale = 1
-    t_scale = 1
+# try:
+#     operatorData = get_operatorData()
+#     w_scale = operatorData.get('magnification', 1)
+#     print('w_scale1',w_scale, type(w_scale))
+#     t_scale = operatorData.get('font_adjustment', 1)
+#     print('t_scale1',t_scale, type(t_scale))
+# except Exception as e:
+#     print('scale err',str(e))
+#     w_scale = 1
+#     t_scale = 1
 
 if platform == "linux":
     base_t_scale = 3
@@ -688,19 +712,19 @@ class MonitorScreen(BoxLayout):
         line_count_layout.add_widget(line_count_layout.lines_input)
         settings_layout.add_widget(line_count_layout)
 
-        mag_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(35) * t_scale)
-        mag_layout.font_label = Label(text='Magnification', size_hint_y=None, height=dp(30) * t_scale, font_size=dp(16) * t_scale)  
-        mag_layout.add_widget(mag_layout.font_label)
-        mag_layout.mag_input = TextInput(text=str(self.w_scale), size_hint_y=None, height=dp(30) * t_scale, font_size=dp(16) * t_scale)
-        mag_layout.add_widget(mag_layout.mag_input)
-        settings_layout.add_widget(mag_layout)
+        # mag_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(35) * t_scale)
+        # mag_layout.font_label = Label(text='Magnification', size_hint_y=None, height=dp(30) * t_scale, font_size=dp(16) * t_scale)  
+        # mag_layout.add_widget(mag_layout.font_label)
+        # mag_layout.mag_input = TextInput(text=str(self.w_scale), size_hint_y=None, height=dp(30) * t_scale, font_size=dp(16) * t_scale)
+        # mag_layout.add_widget(mag_layout.mag_input)
+        # settings_layout.add_widget(mag_layout)
 
-        font_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(35) * t_scale)
-        font_layout.font_label = Label(text='Text Size', size_hint_y=None, height=dp(30) * t_scale, font_size=dp(16) * t_scale)  
-        font_layout.add_widget(font_layout.font_label)
-        font_layout.font_input = TextInput(text=str(self.t_scale), size_hint_y=None, height=dp(30) * t_scale, font_size=dp(16) * t_scale)
-        font_layout.add_widget(font_layout.font_input)
-        settings_layout.add_widget(font_layout)
+        # font_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(35) * t_scale)
+        # font_layout.font_label = Label(text='Text Size', size_hint_y=None, height=dp(30) * t_scale, font_size=dp(16) * t_scale)  
+        # font_layout.add_widget(font_layout.font_label)
+        # font_layout.font_input = TextInput(text=str(self.t_scale), size_hint_y=None, height=dp(30) * t_scale, font_size=dp(16) * t_scale)
+        # font_layout.add_widget(font_layout.font_input)
+        # settings_layout.add_widget(font_layout)
 
         from commands.utils import sonode_version_num
         settings_layout.version = Label(text=f'ver. {sonode_version_num}', size_hint_y=None, height=dp(30) * t_scale, font_size=dp(16) * t_scale)  
@@ -1700,7 +1724,7 @@ class MonitorScreen(BoxLayout):
 
             return container
         if not hasattr(window.status_monitor_display1, "workers_container"):
-            window.status_monitor_display1.workers_container = build_workers_row(['main', 'high', 'low', 'chat'])
+            window.status_monitor_display1.workers_container = build_workers_row(['high', 'main', 'low', 'chat'])
             window.status_monitor_display1.add_widget(window.status_monitor_display1.workers_container)
 
     def run_status_monitor(self, window):
@@ -1799,8 +1823,8 @@ class MonitorScreen(BoxLayout):
 
         try:
             workers = {
-                'main':{'current':{},'queued':0},
                 'high':{'current':{},'queued':0},
+                'main':{'current':{},'queued':0},
                 'low':{'current':{},'queued':0},
                 'chat':{'current':{},'queued':0},
                 # 'super':{'current':{},'queued':0}
@@ -2385,8 +2409,8 @@ class MonitorScreen(BoxLayout):
 
     def workers_status(self):
         workers = {
-            'main':{'current':{},'queued':0},
             'high':{'current':{},'queued':0},
+            'main':{'current':{},'queued':0},
             'low':{'current':{},'queued':0},
             'chat':{'current':{},'queued':0},
             'super':{'current':{},'queued':0}
@@ -2579,8 +2603,8 @@ class MonitorScreen(BoxLayout):
             except Exception as e:
                 print('sys info workers err 2',str(e))
                 workers = {
-                    'main':{'current':{},'queued':0},
                     'high':{'current':{},'queued':0},
+                    'main':{'current':{},'queued':0},
                     'low':{'current':{},'queued':0},
                     'chat':{'current':{},'queued':0},
                     'super':{'current':{},'queued':0}
@@ -2813,8 +2837,8 @@ class MonitorScreen(BoxLayout):
         operatorData = get_operatorData()
         operatorData['monitor_commands'] = self.commands
         operatorData['monitor_preset_commands'] = self.preset_commands
-        operatorData['magnification'] = self.w_scale
-        operatorData['font_adjustment'] = self.t_scale
+        # operatorData['magnification'] = self.w_scale
+        # operatorData['font_adjustment'] = self.t_scale
         operatorData['max_lines'] = self.max_lines
         write_operatorData(operatorData)
 
@@ -2853,6 +2877,7 @@ class ChainsScreen(BoxLayout):
             # self.fetch_plugin_data()
 
     def fetch_plugin_data(self):
+        # not used
         print(f'-fetch_plugin_data {self.option} data')
         try:
             self.operatorData = get_operatorData()
@@ -2975,6 +3000,9 @@ class ChainsScreen(BoxLayout):
                             print('received_json',received_json)
                             if self.operatorData['sonet'] != json.loads(received_json['sonet']):
                                 self.operatorData['sonet'] = json.loads(received_json['sonet'])
+                                write_operatorData(self.operatorData)
+                            if not 'earth_id' in self.operatorData:
+                                self.operatorData['earth_id'] = received_json['earthId']
                                 write_operatorData(self.operatorData)
 
                             self.plugin_data = json.loads(received_json['plugins'])
@@ -3099,7 +3127,7 @@ class ChainsScreen(BoxLayout):
             if regionModel_sign:
                 now = now_utc()
                 regionModel_sign['ParentRegion_obj'] = iden
-                regionModel_sign['commitChain'] = iden
+                regionModel_sign['commitChain'] = self.operatorData['earth_id']
                 regionModel['created'] = dt_to_string(now)
                 from commands.utils import get_most_recent_even_hour
                 regionModel_sign['created'] = dt_to_string(get_most_recent_even_hour(dt=now))
@@ -3115,21 +3143,26 @@ class ChainsScreen(BoxLayout):
             objModel = {}
             nodes = get_node_list(operatorData=operatorData)
             for nodeId, ip in nodes.items():
+                print('nodeId',nodeId)
                 err = 1
                 r = connect_to_node(ip, 'utils/get_object_data', data=data, operatorData=operatorData)
+                print('rr:',r)
                 if r:
                     err =2
                     try:
                         received_json = r.json()
+                        print('received_json',received_json)
                         err = 3
                         objModel_sign = json.loads(received_json['signing_obj'])
+                        print('objModel_sign',objModel_sign)
                         err = 4
                         objModel = json.loads(received_json['model_obj'])
-                        if 'latest_singing_fields' in received_json:
-                            latest_singing_fields = json.loads(received_json['latest_singing_fields'])
+                        if 'latest_signing_fields' in received_json:
+                            latest_signing_fields = json.loads(received_json['latest_signing_fields'])
                         err = 5
                         break
-                    except:
+                    except Exception as e:
+                        print('err 4345',str(e))
                         pass
             fields = objModel_sign
             extra_fields = objModel
@@ -3149,7 +3182,9 @@ class ChainsScreen(BoxLayout):
         print('latest_signing_fields',latest_signing_fields)
         if latest_signing_fields:
             for key, value in form_fields.items():
-                if key in latest_signing_fields:
+                if key in self.skipfields and key in latest_signing_fields and not value_is_none(latest_signing_fields[key]):
+                    self.content.add_widget(FieldRow(key, latest_signing_fields[key], superuser=False))
+                elif key in latest_signing_fields:
                     self.content.add_widget(FieldRow(key, value, editable=True, superuser=False if key in self.skipfields else self.superuser))
             self.content.add_widget(Label(text='New model version fields', halign='left'))
             for key, value in latest_signing_fields.items():
@@ -3157,8 +3192,9 @@ class ChainsScreen(BoxLayout):
                     self.content.add_widget(FieldRow(key, value, editable=True, superuser=False if key in self.skipfields else self.superuser))
             self.content.add_widget(Label(text='Old fields being removed', halign='left'))
             for key, value in form_fields.items():
-                if key not in latest_singing_fields:
+                if key not in latest_signing_fields:
                     self.content.add_widget(FieldRow(key, value, superuser=False if key in self.skipfields else self.superuser))
+
         else:
             for key, value in form_fields.items():
                 self.content.add_widget(FieldRow(key, value, editable=False if key in self.skipfields else True, superuser=False if key in self.skipfields else self.superuser))
@@ -3240,10 +3276,11 @@ class ChainsScreen(BoxLayout):
             if r:
                 received_json = r.json()
                 print('message',received_json['message'])
+                print('received_json',received_json)
                 if received_json['message'] == 'Success':
                     received_json['message'] = 'Error'
                     newId = received_json['obj_id']
-                    if not objData['id']: # only working with plugins and regions here - only new id if new object
+                    if value_is_none(objData['id']): # only working with plugins and regions here - only new id if new object
                         objData['id'] = newId
                         if 'networkChain' in objData:
                             objData['networkChain'] = newId
@@ -3726,7 +3763,7 @@ class NodesScreen(BoxLayout):
         self.scroll_view.add_widget(self.content)
         self.add_widget(self.scroll_view)
 
-        fields = ['nickname', 'local_address', 'port', 'remote_address', 'remote_port', 'username', 'password']
+        fields = ['nickname', 'local_address', 'port', 'username', 'password']
         if not fetch_secure_item("sysPass"):
             fields.append('local_password')
         for i in fields:
@@ -4170,7 +4207,7 @@ class NodesScreen(BoxLayout):
         self.select_node(node_id=self.starting_node, fetch_remote=False)
         self.parent_screen.node_screen = None
         try:
-            self.parent_screen.display_layout.text_input.text += '\n\nAll node updates complete.\n\n'
+            self.parent_screen.display_layout.text_input.text += f'\n\nAll node updates complete ({len(self.completed_nodes)})\n\n'
         except Exception as e:
             print('display_layout.text_input err',str(e))
 
@@ -4827,7 +4864,7 @@ class ProfileScreen(BoxLayout):
 
     def save_settings(self, instance=None):
         self.save_button.text = 'Saving...'
-        threading.Thread(target=self.save_settings_step2, args=(operatorData,)).start()
+        threading.Thread(target=self.save_settings_step2, args=(None,)).start()
 
     def save_settings_step2(self, operatorData=None):
         filename = Path.home() / "Sonet" / ".data" / "settings.json"
@@ -5022,7 +5059,7 @@ class SetupScreen(BoxLayout):
                 self.scroll_view = ScrollView(size_hint=(1, 1), do_scroll_x=False, do_scroll_y=True, scroll_type=['bars', 'content'],bar_width=17, bar_color=(1, 1, 1, 1), bar_inactive_color=(1, 1, 1, .3))
                 self.content = BoxLayout(orientation="vertical", size_hint_y=None)
                 self.content.bind(minimum_height=self.content.setter("height"))
-                self.title = Label(text='New Install', size_hint_y=None, height=dp(30), halign='center')
+                self.title = Label(text='New Install', size_hint_y=None, height=dp(30)* w_scale, halign='center')
                 self.add_widget(self.title)
                 self.add_widget(Divider(padding=0))
                 self.text_input = TextInput(
@@ -5032,7 +5069,8 @@ class SetupScreen(BoxLayout):
                     halign="left",
                     multiline=True, 
                     background_color=dark_blue2,
-                    foreground_color=(1, 1, 1, 1) 
+                    foreground_color=(1, 1, 1, 1), 
+                    font_size=dp(15) * t_scale
                 )
                 self.text_input.bind(minimum_height=self.update_textinput_height)
                 Window.bind(size=self.update_textinput_height)
@@ -5086,56 +5124,56 @@ class SetupScreen(BoxLayout):
                         debug = self.operatorData['user_is_super']
                     debug = True
                     if debug:
-                        self.test_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30))
-                        self.test_label = Label(text='Debug:', size_hint=(1, 1), height=dp(30), size_hint_x=None, width=dp(130))
+                        self.test_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30)* w_scale)
+                        self.test_label = Label(text='Debug:', size_hint=(1, 1), height=dp(30)* w_scale, size_hint_x=None, width=dp(130)* w_scale, font_size=dp(15) * t_scale)
                         with self.test_label.canvas.before:
                             Color(1, 1, 1, 1)
-                        self.test_input = CheckBox(size_hint=(1, None), height=dp(30), active=True)
+                        self.test_input = CheckBox(size_hint=(1, None), height=dp(30)* w_scale, active=True)
                         self.test_layout.add_widget(self.test_label)
                         self.test_layout.add_widget(self.test_input)
                         self.add_widget(self.test_layout)
                     
-                    self.new_database_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30))
-                    self.new_database_label = Label(text='Reuse Database:', size_hint=(1, 1), height=dp(30), size_hint_x=None, width=dp(130))
+                    self.new_database_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30)* w_scale)
+                    self.new_database_label = Label(text='Reuse Database:', size_hint=(1, 1), height=dp(30)* w_scale, size_hint_x=None, width=dp(130)* w_scale, font_size=dp(15) * t_scale)
                     with self.new_database_label.canvas.before:
                         Color(1, 1, 1, 1)
-                    self.new_database_input = CheckBox(size_hint=(1, None), height=dp(30), active=False)
+                    self.new_database_input = CheckBox(size_hint=(1, None), height=dp(30)* w_scale, active=False)
                     self.new_database_layout.add_widget(self.new_database_label)
                     self.new_database_layout.add_widget(self.new_database_input)
                     self.add_widget(self.new_database_layout)
 
-                    self.quick_install_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30))
-                    self.quick_install_label = Label(text='Quick Install:', size_hint=(1, 1), height=dp(30), size_hint_x=None, width=dp(130))
+                    self.quick_install_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30)* w_scale)
+                    self.quick_install_label = Label(text='Quick Install:', size_hint=(1, 1), height=dp(30)* w_scale, size_hint_x=None, width=dp(130)* w_scale, font_size=dp(15) * t_scale)
                     with self.quick_install_label.canvas.before:
                         Color(1, 1, 1, 1)
-                    self.quick_install_input = CheckBox(size_hint=(1, None), height=dp(30), active=False)
+                    self.quick_install_input = CheckBox(size_hint=(1, None), height=dp(30)* w_scale, active=False)
                     self.quick_install_layout.add_widget(self.quick_install_label)
                     self.quick_install_layout.add_widget(self.quick_install_input)
                     self.add_widget(self.quick_install_layout)
 
-                    self.port_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30))
-                    self.port_label = Label(text="Port:", size_hint=(1, 1), height=dp(30), size_hint_x=None, width=dp(130))
+                    self.port_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30)* w_scale)
+                    self.port_label = Label(text="Port:", size_hint=(1, 1), height=dp(30)* w_scale, size_hint_x=None, width=dp(130)* w_scale, font_size=dp(15) * t_scale)
                     with self.port_label.canvas.before:
                         Color(1, 1, 1, 1)
                     if 'port' in self.operatorData:
                         port = self.operatorData['port']
                     else:
                         port = '9909'
-                    self.port_input = TextInput(text=port, size_hint=(1, None), height=dp(30), disabled=True)
+                    self.port_input = TextInput(text=port, size_hint=(1, None), height=dp(30)* w_scale, disabled=True, font_size=dp(15) * t_scale)
 
                     self.port_layout.add_widget(self.port_label)
                     self.port_layout.add_widget(self.port_input)
                     self.add_widget(self.port_layout)
 
-                    self.open_ports_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30))
-                    self.open_ports_label = Label(text="Open Ports:", size_hint=(1, 1), height=dp(30), size_hint_x=None, width=dp(130))
+                    self.open_ports_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30)* w_scale)
+                    self.open_ports_label = Label(text="Open Ports:", size_hint=(1, 1), height=dp(30)* w_scale, size_hint_x=None, width=dp(130)* w_scale, font_size=dp(15) * t_scale)
                     with self.open_ports_label.canvas.before:
                         Color(1, 1, 1, 1)
                     if 'open_ports' in self.operatorData:
                         open_ports = self.operatorData['open_ports']
                     else:
                         open_ports = '22, 5900, 3389'
-                    self.open_ports_input = TextInput(text=open_ports, size_hint=(1, None), height=dp(30))
+                    self.open_ports_input = TextInput(text=open_ports, size_hint=(1, None), height=dp(30)* w_scale, font_size=dp(15) * t_scale)
 
                     self.open_ports_layout.add_widget(self.open_ports_label)
                     self.open_ports_layout.add_widget(self.open_ports_input)
@@ -5150,11 +5188,11 @@ class SetupScreen(BoxLayout):
                     # else:
                     #     node_nickname = 'Node ' + str(random.randint(100, 999))
 
-                    self.node_nickname_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30))
-                    self.node_nickname_label = Label(text="Node Name:", size_hint=(1, 1), height=dp(30), size_hint_x=None, width=dp(130))
+                    self.node_nickname_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30)* w_scale)
+                    self.node_nickname_label = Label(text="Node Name:", size_hint=(1, 1), height=dp(30)* w_scale, size_hint_x=None, width=dp(130)* w_scale, font_size=dp(15) * t_scale)
                     with self.node_nickname_label.canvas.before:
                         Color(1, 1, 1, 1)
-                    self.node_nickname_input = TextInput(text=node_nickname, size_hint=(1, None), height=dp(30))
+                    self.node_nickname_input = TextInput(text=node_nickname, size_hint=(1, None), height=dp(30)* w_scale, font_size=dp(15) * t_scale)
                     self.node_nickname_layout.add_widget(self.node_nickname_label)
                     self.node_nickname_layout.add_widget(self.node_nickname_input)
                     self.add_widget(self.node_nickname_layout)
@@ -5162,12 +5200,12 @@ class SetupScreen(BoxLayout):
                     if self.remote_data:
                         self.systemPass = self.remote_data['password']
                     else:
-                        self.pass_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30))
-                        self.toggle_button = Button(text='Show', size_hint_x=None, width=dp(70))
-                        self.pass_label = Label(text="System Password:", size_hint=(1, 1), height=dp(30), size_hint_x=None, width=dp(130))
+                        self.pass_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30)* w_scale)
+                        self.toggle_button = Button(text='Show', size_hint_x=None, width=dp(70)* w_scale, font_size=dp(15) * t_scale)
+                        self.pass_label = Label(text="System Password:", size_hint=(1, 1), height=dp(30)* w_scale, size_hint_x=None, width=dp(130)* w_scale, font_size=dp(15) * t_scale)
                         with self.pass_label.canvas.before:
                             Color(1, 1, 1, 1)
-                        self.pass_input = TextInput(text='', hint_text="system pass needed, kept on device", size_hint=(1, None), height=dp(30), multiline=False, password=True)
+                        self.pass_input = TextInput(text='', hint_text="system pass needed, kept on device", size_hint=(1, None), height=dp(30)* w_scale, multiline=False, password=True, font_size=dp(15) * t_scale)
                         self.pass_input.bind(on_text_validate=lambda instance: self.run_install(instance))
                         self.pass_input.focus = True
                         self.toggle_button.bind(on_press=self.toggle_password_visibility)
@@ -5177,12 +5215,12 @@ class SetupScreen(BoxLayout):
                         self.add_widget(self.pass_layout)
                     if 'userPass' not in self.operatorData or not self.operatorData['userPass']:
                         if 'accnt_privKey' not in self.operatorData or not self.operatorData['accnt_privKey'] or 'accnt_pubKey' not in self.operatorData or not self.operatorData['accnt_pubKey']:
-                            self.passphrase_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30))
-                            self.toggle_button = Button(text='Show', size_hint_x=None, width=dp(70))
-                            self.passphrase_label = Label(text=f"{self.operatorData['username']} Passphrase:", size_hint=(1, 1), height=dp(30), size_hint_x=None, width=dp(130))
+                            self.passphrase_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30)* w_scale)
+                            self.toggle_button = Button(text='Show', size_hint_x=None, width=dp(70)* w_scale)
+                            self.passphrase_label = Label(text=f"{self.operatorData['username']} Passphrase:", size_hint=(1, 1), height=dp(30)* w_scale, size_hint_x=None, width=dp(130)* w_scale, font_size=dp(15) * t_scale)
                             with self.passphrase_label.canvas.before:
                                 Color(1, 1, 1, 1)
-                            self.passphrase_input = TextInput(text='', hint_text="passphrase not stored after install", size_hint=(1, None), height=dp(30), multiline=False, password=True)
+                            self.passphrase_input = TextInput(text='', hint_text="passphrase not stored after install", size_hint=(1, None), height=dp(30)* w_scale, multiline=False, password=True, font_size=dp(15) * t_scale)
                             self.passphrase_input.bind(on_text_validate=lambda instance: self.run_install(instance))
                             self.passphrase_input.focus = True
                             self.toggle_button.bind(on_press=self.toggle_password_visibility)
@@ -5191,7 +5229,7 @@ class SetupScreen(BoxLayout):
                             self.passphrase_layout.add_widget(self.toggle_button)
                             self.add_widget(self.passphrase_layout)
 
-                    self.continue_button = Button(text='Install', size_hint=(1, None), height=dp(30))
+                    self.continue_button = Button(text='Install', size_hint=(1, None), height=dp(30)* w_scale, font_size=dp(15) * t_scale)
                     self.continue_button.bind(on_press=self.run_install)
                     self.add_widget(self.continue_button)
 
@@ -5244,7 +5282,7 @@ class SetupScreen(BoxLayout):
                 self.scroll_view = ScrollView(size_hint=(1, 1), do_scroll_x=False, do_scroll_y=True, scroll_type=['bars', 'content'],bar_width=17, bar_color=(1, 1, 1, 1), bar_inactive_color=(1, 1, 1, .3))
                 self.content = BoxLayout(orientation="vertical", size_hint_y=None)
                 self.content.bind(minimum_height=self.content.setter("height"))
-                self.title = Label(text='Activate', size_hint_y=None, height=dp(30), halign='center')
+                self.title = Label(text='Activate', size_hint_y=None, height=dp(30)* w_scale, halign='center', font_size=dp(15) * t_scale)
                 self.add_widget(self.title)
                 self.add_widget(Divider(padding=0))
                 self.text_input = TextInput(
@@ -5254,7 +5292,8 @@ class SetupScreen(BoxLayout):
                     halign="left",
                     multiline=True, 
                     background_color=dark_blue2,
-                    foreground_color=(1, 1, 1, 1) 
+                    foreground_color=(1, 1, 1, 1),
+                    font_size=dp(15) * t_scale
                 )
                 self.text_input.bind(minimum_height=self.update_textinput_height)
                 Window.bind(size=self.update_textinput_height)
@@ -5273,7 +5312,7 @@ class SetupScreen(BoxLayout):
                         for text in texts:
                             self.text_input.text += text + '\n\n'
                         self.add_widget(Divider(padding=0))
-                        self.continue_button = Button(text='Select Plugins', size_hint=(1, None), height=dp(30))
+                        self.continue_button = Button(text='Select Plugins', size_hint=(1, None), height=dp(30)* w_scale)
                         self.continue_button.bind(on_press=lambda instance: self.parent_screen.switch_layout('plugins'))
                         self.add_widget(self.continue_button)
                     else:    
@@ -5290,35 +5329,36 @@ class SetupScreen(BoxLayout):
 
                         if 'debug' in full_nodeData['meta'] and full_nodeData['meta']['debug']:
                             self.debug = True
-                            self.broadcast_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30))
-                            self.broadcast_label = Label(text='Broadcast & Sync:', size_hint=(1, 1), height=dp(30), size_hint_x=None, width=dp(130))
+                            self.broadcast_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30)* w_scale)
+                            self.broadcast_label = Label(text='Broadcast & Sync:', size_hint=(1, 1), height=dp(30)* w_scale, size_hint_x=None, width=dp(130)* w_scale, font_size=dp(15) * t_scale)
                             with self.broadcast_label.canvas.before:
                                 Color(1, 1, 1, 1)
-                            self.broadcast_input = CheckBox(size_hint=(1, None), height=dp(30), active=True)
+                            self.broadcast_input = CheckBox(size_hint=(1, None), height=dp(30)* w_scale, active=True)
                             self.broadcast_layout.add_widget(self.broadcast_label)
                             self.broadcast_layout.add_widget(self.broadcast_input)
                             self.add_widget(self.broadcast_layout)
 
-                        node_types = ('Server/Maintainer', 'Relay')
+                        node_types = ('Auto', 'Relay')
                         if verify_super_status(self.operatorData):
-                            node_types = ('Server','Maintainer','Server/Maintainer','Intelligence','Relay')
+                            node_types = ('Server','Maintainer','Auto','Intelligence','Relay')
                         try:
-                            selected_node_type = 'Server/Maintainer'
+                            selected_node_type = 'Auto'
                             for n in node_types:
                                 if n.lower() == full_nodeData['settings']['node_type'].lower():
                                     selected_node_type = n
                         except:
                             pass
-                        self.node_type_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30))
-                        self.node_type_label = Label(text='Node Type:', size_hint=(1, 1), height=dp(30), size_hint_x=None, width=dp(130))
+                        self.node_type_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30)* w_scale)
+                        self.node_type_label = Label(text='Node Type:', size_hint=(1, 1), height=dp(30)* w_scale, size_hint_x=None, width=dp(130)* w_scale, font_size=dp(15) * t_scale)
                         with self.node_type_label.canvas.before:
                             Color(1, 1, 1, 1)
                         self.node_type_input = Spinner(
                                 text=selected_node_type,
                                 values=node_types,
                                 size_hint=(1, 1),
-                                height=dp(30),
-                                width=dp(130)
+                                height=dp(30)* w_scale,
+                                width=dp(130)* w_scale,
+                                font_size=dp(15) * t_scale
                             )
                         self.node_type_input.bind(text=self.spinner_select)
                         self.node_type_layout.add_widget(self.node_type_label)
@@ -5334,16 +5374,17 @@ class SetupScreen(BoxLayout):
                                         selected_node_type = n
                             except:
                                 pass
-                            self.node_level_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30))
-                            self.node_level_label = Label(text='Node Level:', size_hint=(1, 1), height=dp(30), size_hint_x=None, width=dp(130))
+                            self.node_level_layout = BoxLayout(orientation='horizontal', spacing=10* w_scale, size_hint=(1, None), height=dp(30)* w_scale)
+                            self.node_level_label = Label(text='Node Level:', size_hint=(1, 1), height=dp(30)* w_scale, size_hint_x=None, width=dp(130)* w_scale, font_size=dp(15) * t_scale)
                             with self.node_level_label.canvas.before:
                                 Color(1, 1, 1, 1)
                             self.node_level_input = Spinner(
                                     text=selected_node_level,
                                     values=node_levels,
                                     size_hint=(1, 1),
-                                    height=dp(30),
-                                    width=dp(130)
+                                    height=dp(30)* w_scale,
+                                    width=dp(130)* w_scale,
+                                    font_size=dp(15) * t_scale
                                 )
                             self.node_level_input.bind(text=self.spinner_select)
                             self.node_level_layout.add_widget(self.node_level_label)
@@ -5351,65 +5392,66 @@ class SetupScreen(BoxLayout):
                             self.add_widget(self.node_level_layout)
                         else:
                             selected_node_level = 'Standard'
-                            self.node_level_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30))
-                            self.node_level_label = Label(text='Node Level:', size_hint=(1, 1), height=dp(30), size_hint_x=None, width=dp(130))
+                            self.node_level_layout = BoxLayout(orientation='horizontal', spacing=10* w_scale, size_hint=(1, None), height=dp(30)* w_scale)
+                            self.node_level_label = Label(text='Node Level:', size_hint=(1, 1), height=dp(30), size_hint_x=None, width=dp(130)* w_scale* w_scale, font_size=dp(15) * t_scale)
                             with self.node_level_label.canvas.before:
                                 Color(1, 1, 1, 1)
                             self.node_level_input = Spinner(
                                     text=selected_node_level,
                                     size_hint=(1, 1),
-                                    height=dp(30),
-                                    width=dp(130)
+                                    height=dp(30)* w_scale,
+                                    width=dp(130)* w_scale,
+                                    font_size=dp(15) * t_scale
                                 )
                             self.node_level_input.bind(text=self.spinner_select)
                             self.node_level_layout.add_widget(self.node_level_label)
                             self.node_level_layout.add_widget(self.node_level_input)
 
-                        self.title_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30))
-                        self.title_label = Label(text='Node Name:', size_hint=(1, 1), height=dp(30), size_hint_x=None, width=dp(130))
+                        self.title_layout = BoxLayout(orientation='horizontal', spacing=10* w_scale, size_hint=(1, None), height=dp(30)* w_scale)
+                        self.title_label = Label(text='Node Name:', size_hint=(1, 1), height=dp(30)* w_scale, size_hint_x=None, width=dp(130)* w_scale, font_size=dp(15) * t_scale)
                         with self.title_label.canvas.before:
                             Color(1, 1, 1, 1)
-                        self.title_input = TextInput(text=full_nodeData['settings']['node_name'], size_hint=(1, None), height=dp(30))
+                        self.title_input = TextInput(text=full_nodeData['settings']['node_name'], size_hint=(1, None), height=dp(30)* w_scale, font_size=dp(15) * t_scale)
                         self.title_layout.add_widget(self.title_label)
                         self.title_layout.add_widget(self.title_input)
                         self.add_widget(self.title_layout)
 
-                        self.ip_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30))
-                        self.ip_label = Label(text="Address:", size_hint=(1, 1), height=dp(30), size_hint_x=None, width=dp(130))
+                        self.ip_layout = BoxLayout(orientation='horizontal', spacing=10* w_scale, size_hint=(1, None), height=dp(30)* w_scale)
+                        self.ip_label = Label(text="Address:", size_hint=(1, 1), height=dp(30)* w_scale, size_hint_x=None, width=dp(130)* w_scale, font_size=dp(15) * t_scale)
                         with self.ip_label.canvas.before:
                             Color(1, 1, 1, 1)
                         address = 'Cloudflare Tunnel'
                         if 'nodeData' in full_nodeData and 'address' in full_nodeData['settings'] and full_nodeData['settings']['address']:
                             address = full_nodeData['settings']['address']
-                        self.ip_input = TextInput(text=address, size_hint=(1, None), height=dp(30))
+                        self.ip_input = TextInput(text=address, size_hint=(1, None), height=dp(30)* w_scale, font_size=dp(15) * t_scale)
                         self.ip_layout.add_widget(self.ip_label)
                         self.ip_layout.add_widget(self.ip_input)
                         self.add_widget(self.ip_layout)
 
-                        self.port_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30))
-                        self.port_label = Label(text="Port:", size_hint=(1, 1), height=dp(30), size_hint_x=None, width=dp(130))
+                        self.port_layout = BoxLayout(orientation='horizontal', spacing=10* w_scale, size_hint=(1, None), height=dp(30)* w_scale)
+                        self.port_label = Label(text="Port:", size_hint=(1, 1), height=dp(30)* w_scale, size_hint_x=None, width=dp(130)* w_scale, font_size=dp(15) * t_scale)
                         with self.port_label.canvas.before:
                             Color(1, 1, 1, 1)
-                        self.port_input = TextInput(text=full_nodeData['settings']['port'], size_hint=(1, None), height=dp(30), disabled=True)
+                        self.port_input = TextInput(text=full_nodeData['settings']['port'], size_hint=(1, None), height=dp(30)* w_scale, disabled=True, font_size=dp(15) * t_scale)
                         self.port_layout.add_widget(self.port_label)
                         self.port_layout.add_widget(self.port_input)
                         self.add_widget(self.port_layout)
 
-                        self.open_ports_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, None), height=dp(30))
-                        self.open_ports_label = Label(text="Open Ports:", size_hint=(1, 1), height=dp(30), size_hint_x=None, width=dp(130))
+                        self.open_ports_layout = BoxLayout(orientation='horizontal', spacing=10* w_scale, size_hint=(1, None), height=dp(30)* w_scale)
+                        self.open_ports_label = Label(text="Open Ports:", size_hint=(1, 1), height=dp(30)* w_scale, size_hint_x=None, width=dp(130)* w_scale, font_size=dp(15) * t_scale)
                         with self.open_ports_label.canvas.before:
                             Color(1, 1, 1, 1)
                         if 'open_ports' in full_nodeData['settings']:
                             open_ports = full_nodeData['settings']['open_ports']
                         else:
                             open_ports = '22, 5900, 3389'
-                        self.open_ports_input = TextInput(text=open_ports, size_hint=(1, None), height=dp(30))
+                        self.open_ports_input = TextInput(text=open_ports, size_hint=(1, None), height=dp(30)* w_scale, font_size=dp(15) * t_scale)
 
                         self.open_ports_layout.add_widget(self.open_ports_label)
                         self.open_ports_layout.add_widget(self.open_ports_input)
                         self.add_widget(self.open_ports_layout)
                         
-                        self.continue_button = Button(text='Continue', size_hint=(1, None), height=dp(30))
+                        self.continue_button = Button(text='Continue', size_hint=(1, None), height=dp(30)* w_scale, font_size=dp(15) * t_scale)
                         self.continue_button.bind(on_press=self.run_activate)
                         self.add_widget(self.continue_button)
 
@@ -6649,7 +6691,7 @@ class SetupScreen(BoxLayout):
                             # should include in get_or_create_node_obj instead of here
                             wal_id_data = {'objType':'Wallet','User_obj':user_id,'Name':'Rewards'}
                             id_len = received_json['id_len']
-                            reward_walletData['id'] = '1walSo' + generate_id(wal_id_data, length=id_len)
+                            reward_walletData['id'] = '2walSo' + generate_id(wal_id_data, length=id_len)
                             reward_walletData['User_obj'] = user_id
                             reward_walletData['networkChain'] = user_id
                             reward_walletData['created'] = dt_to_string(now)
@@ -6928,10 +6970,8 @@ class SetupScreen(BoxLayout):
 
                                         operatorData['ip_master_list'] = {self_nodeDetails['nodeData']['id']:{'address':self_nodeData['address']}}
                                         print('really almost done')
-                                        models = {'Earth':earthModel, 'Accounts Plugin':accountsPlugin, 'Network Plugin':networkPlugin, 'Posts Plugin':postsPlugin, 'Transactions Plugin':transactionsPlugin}
-                                        if sovotePlugin:
-                                            models['SoVote Plugin'] = sovotePlugin
-                                            # models['Wallet'] = reward_walletData
+                                        models = {'Earth':earthModel, 'Accounts Plugin':accountsPlugin, 'Network Plugin':networkPlugin, 'Posts Plugin':postsPlugin, 'SoVote Plugin':sovotePlugin, 'Transactions Plugin':transactionsPlugin}
+                                        
                                         
                                         def set_obj(objModel, msg, keys='super'):
                                             print('objModel',objModel)
@@ -7227,6 +7267,7 @@ class SetupScreen(BoxLayout):
             user_id = self.operatorData['user_id']
             super_keyPair = createKeyPair(user_id, self.passphrase, 'guardian', key_strength='ML_DSA_87')
             from commands.utils import hash_upk_id
+            print('HHEEEERRRREE',{'pubKey':super_keyPair[1],'privKey':super_keyPair[0],'keyId':hash_upk_id(super_keyPair[1])})
             store_secure_item("temp_keys", {'pubKey':super_keyPair[1],'privKey':super_keyPair[0],'keyId':hash_upk_id(super_keyPair[1])})
             if next_cmd:
                 next_cmd()
@@ -7261,7 +7302,7 @@ class SetupScreen(BoxLayout):
         except Exception as e:
             print('run_activate err 1',str(e))
             pass
-        self.node_type = 'server/maintainer'
+        self.node_type = 'Auto'
         try:
             self.node_type = self.node_type_input.text.lower()
             self.node_type_layout.remove_widget(self.node_type_label)
@@ -7518,7 +7559,7 @@ class SetupScreen(BoxLayout):
         except Exception as e:
             print('reactivate err 1',str(e))
             pass
-        self.node_type = 'server/maintainer'
+        self.node_type = 'Auto'
         try:
             self.node_type = self.node_type_input.text.lower()
             self.node_type_layout.remove_widget(self.node_type_label)
@@ -7730,7 +7771,7 @@ class SetupScreen(BoxLayout):
                 self.proceed_button.bind(on_press=self.proceed_uninstall)
                 self.add_widget(self.proceed_button)
 
-            response = f'\nFailed to contact network. Continuing with uninstall could cause a security concern with this node keys.\n'
+            response = f'\nFailed to contact network. Continuing with uninstall could cause a security concern with this node key.\n'
             Clock.schedule_once(lambda dt: add_proceed_button())
             Clock.schedule_once(lambda dt, line=response: self.update_text(line))
             
@@ -8217,6 +8258,7 @@ class CommandRunner:
                             ): self.update_output(line)
                         )
                         self.operator_screen.job_running = False
+                        Clock.schedule_once(lambda dt, line=f'Updater halted due to remote command failure': self.update_output(line))
                         raise RuntimeError("Updater halted due to remote command failure")
                 else:
                     with self.lock:

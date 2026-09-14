@@ -171,7 +171,7 @@ def pull_git(output, remote_cmd=False):
     from commands.utils import pull_git_server
     get_variables()
     global operatorData
-    pull_git_server(output=output, operatorData=operatorData)
+    pull_git_server(output=output, operatorData=operatorData, install=True)
 
 def run_create_env(output, remote_cmd=False):
     from commands.utils import setup_pyenv
@@ -1031,7 +1031,7 @@ special_commands = [
 
 action_cmds = [
     ['run_command', 'get_variables'],
-    ['run_command', 'hardware_check'],
+    # ['run_command', 'hardware_check'],
     ['run_command', 'pull_git'],
     ['run_command', 'adjust_firewall'],
     ["chmod", "755", homepath + "/Sonet/SoNodeServer"],
@@ -1073,6 +1073,7 @@ action_cmds = [
     ["run_command", "write_gunicorn_service"],
     ["run_command", "gunicorn_logrotate"],
     ["raise_if_error", "sudo", "-S", f"{homepath}/Sonet/.data/env/bin/python3", f"{homepath}/Sonet/SoNodeServer/manage.py", "check"],
+    ["pkill", "-9", "-f", "'rqworker'"],
     ["sudo", "-S", "systemctl", "daemon-reexec"],
     ["sudo", "-S", "systemctl", "daemon-reload"],
     ["sudo", "-S", "systemctl", "stop", "gunicorn.socket"],

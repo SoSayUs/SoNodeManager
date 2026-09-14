@@ -97,7 +97,7 @@ def pull_git(output, remote_cmd=False):
     get_variables()
     from commands.utils import pull_git_server
     global operatorData
-    pull_git_server(output=output, operatorData=operatorData)
+    pull_git_server(output=output, operatorData=operatorData, install=True)
 
 def setup_firewall(open_port=True, output=None, nodeData=None, remote_cmd=False):
     print('-setup_firewall')
@@ -112,26 +112,38 @@ def run_create_env(output, remote_cmd=False):
     global node_data
     setup_pyenv(output=output, node_data=node_data)
 
-def schedule(content, output_display):
+def schedule(content, output_display, replace=False):
     from ops import display_max_size
     try:
         if output_display:
-            output_display.text += f'\n{content}'
-            lines = output_display.text.splitlines()
-            if display_max_size > 0 and len(lines) > display_max_size:
-                last_n_lines = lines[-display_max_size:]
-                result = "\n".join(last_n_lines)
-                output_display.text = result
+            if not replace:
+                output_display.text += f'\n{content}'
+                lines = output_display.text.splitlines()
+                if display_max_size > 0 and len(lines) > display_max_size:
+                    last_n_lines = lines[-display_max_size:]
+                    result = "\n".join(last_n_lines)
+                    output_display.text = result
+            else:
+                text = f'\n{content}'
+                lines = output_display.text.splitlines()
+                lines[-1] = text
+                if display_max_size > 0 and len(lines) > display_max_size:
+                    last_n_lines = lines[-display_max_size:]
+                    result = "\n".join(last_n_lines)
+                    output_display.text = result
+                else:
+                    output_display.text = "\n".join(lines)
+
     except Exception as e:
         # print('schedule err',str(e))
         pass
 
-def update_output(content, output_display=None):
+def update_output(content, output_display=None, replace=False):
     try:
         if not content.endswith('\n'):
             content += '\n'
         if output_display:
-            Clock.schedule_once(lambda dt, line=content: schedule(line, output_display))
+            Clock.schedule_once(lambda dt, line=content: schedule(line, output_display, replace))
         print(content)
     except Exception as e:
         # print('update_output err',str(e))
@@ -769,6 +781,60 @@ def config_nginx(install=True, output=None, nodeData=None, remote_cmd=False, clo
         command_runner = CommandRunner(None, commands, None, None, special_commands)
         threading.Thread(target=command_runner.run_commands).start()
 
+def link_postgres(install=True, output=None, remote_cmd=False):
+
+    def run(cmd):
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        return result.returncode, result.stdout.strip(), result.stderr.strip()
+
+
+    def find_postgres_formulae():
+        code, out, err = run([brew_path, "list"])
+        if code != 0:
+            print(f"Error running `brew list`: {err}")
+            
+
+        formulae = [line for line in out.splitlines() if re.match(r"^postgresql(@\d+)?$", line)]
+        return formulae
+
+
+    formulae = find_postgres_formulae()
+
+    if not formulae:
+        print("No postgresql formula found via `brew list`.")
+        print("Try: brew install postgresql@16")
+        
+
+    if len(formulae) == 1:
+        chosen = formulae[0]
+    else:
+        # Prefer the highest version number if multiple are installed
+        def version_key(name):
+            match = re.search(r"@(\d+)", name)
+            return int(match.group(1)) if match else 0
+
+        formulae.sort(key=version_key, reverse=True)
+        print("Multiple postgresql versions found:")
+        for i, f in enumerate(formulae, 1):
+            print(f"  {i}. {f}")
+        print(f"Defaulting to highest version: {formulae[0]}")
+        chosen = formulae[0]
+
+    print(f"\nLinking {chosen} ...")
+    update_output(f"\nLinking {chosen} ...", output)
+    code, out, err = run([brew_path, "link", chosen, "--force"])
+    print(out)
+    if err:
+        print(err)
+
+    if code == 0:
+        # print(f"\nLinked {chosen}.")
+        update_output(f"\nLinked {chosen}", output)
+    else:
+        # print(f"\nLinking failed (exit code {code}).")
+        update_output(f"\nLinking failed (exit code {code})", output)
+        
+
 
 # in the event the mac upgrades postgres without constent
 MIGRATE_SCRIPT = f'/Users/{username}/Sonet/SoNodeManager/scripts/pg_automigrate.sh'
@@ -832,22 +898,23 @@ remove_for_new_database = [
 ]
 
 special_commands = [
-    # {'cmd':'hardware_check', 'reqs':'output_display'},
+    {'cmd':'hardware_check', 'reqs':'output_display'},
     {'cmd':'run_fetch_secret_key', 'reqs':'display_content'},
     {'cmd':'run_adjust_settings', 'reqs':'output_display'},
+    {'cmd':'link_postgres', 'reqs':'output_display'},
     {'cmd':'get_local_ip'},
     # {'cmd':'setup_rqworker', 'reqs':'output_display'},
     {'cmd':'config_supervisor', 'reqs':'output_display'},
-    {'cmd':'edit_worker', 'reqs':'output_display'},
+    # {'cmd':'edit_worker', 'reqs':'output_display'},
     {'cmd':'write_supervisor_plist', 'reqs':'output_display'},
-    {'cmd':'config_gunicorn', 'reqs':'output_display'},
+    # {'cmd':'config_gunicorn', 'reqs':'output_display'},
     {'cmd':'setup_gunicorn', 'reqs':'output_display'},
     {'cmd':'edit_nginx_conf', 'reqs':'output_display'},
     {'cmd':'config_nginx', 'reqs':'output_display'},
     {'cmd':'run_create_env', 'reqs':'output_display'},
-    {'cmd':'fetch_chrome_and_chromedriver', 'reqs':'output_display'},
-    {'cmd':'update_path'},
-    {'cmd':'setup_firewall', 'reqs':'output_display'},
+    # {'cmd':'fetch_chrome_and_chromedriver', 'reqs':'output_display'},
+    # {'cmd':'update_path'},
+    # {'cmd':'setup_firewall', 'reqs':'output_display'},
     {'cmd':'get_variables'},
     {'cmd':'pull_git', 'reqs':'output_display'},
     {'cmd':'finalize', 'reqs':'output_display'},
@@ -872,16 +939,22 @@ action_cmds = [
     [brew_path, 'install', 'postgresql'],
     ['sudo', '-S', 'chown', '-R', f'{username}:{group}', pg_data_dir],
     ['chmod', '700', pg_data_dir],
+    ['run_command', 'link_postgres'],
     [brew_path, 'services', 'stop', f'postgresql@{pg_version}'],
     [brew_path, 'services', 'cleanup'],
     [brew_path, 'services', 'start', f'postgresql@{pg_version}'],
     f'''/Users/{username}/Sonet/.data/env/bin/python3 {homepath}/Sonet/SoNodeServer/manage.py shell -c "from django.core.management.utils import get_random_secret_key; print('key:', get_random_secret_key())"''',
+    ['/bin/sleep', '2'],
     ['run_command', 'run_fetch_secret_key'],
     ['run_command', 'run_adjust_settings'],
-    ["sudo", "-S", "-u", username, psql_path, "-c", "CREATE USER queue WITH PASSWORD 'K9V43S2P1';"],
-    ["sudo", "-S", "-u", username, psql_path, "-c", "ALTER USER queue WITH SUPERUSER;"],
-    ["sudo", "-S", "-u", username, psql_path, "-c", "DROP DATABASE so_data;"],
-    ["sudo", "-S", "-u", username, psql_path, "-c", "CREATE DATABASE so_data;"],
+    f"echo 'input_pass' | sudo -S -u {username} {psql_path} -U {username} -c 'CREATE USER queue WITH PASSWORD \\'K9V43S2P1\\';'",
+    f"echo 'input_pass' | sudo -S -u {username} {psql_path} -U {username} -c 'ALTER USER queue WITH SUPERUSER CREATEDB CREATEROLE;'",
+    f"echo 'input_pass' | sudo -S -u {username} {psql_path} -U {username} -c 'DROP DATABASE IF EXISTS so_data;'",
+    f"echo 'input_pass' | sudo -S -u {username} {psql_path} -U {username} -c 'CREATE DATABASE so_data OWNER queue;'",
+    # ["sudo", "-S", "-u", username, psql_path, "-c", "CREATE USER queue WITH PASSWORD 'K9V43S2P1';"],
+    # ["sudo", "-S", "-u", username, psql_path, "-c", "ALTER USER queue WITH SUPERUSER;"],
+    # ["sudo", "-S", "-u", username, psql_path, "-c", "DROP DATABASE so_data;"],
+    # ["sudo", "-S", "-u", username, psql_path, "-c", "CREATE DATABASE so_data;"],
     [f'/Users/{username}/Sonet/.data/env/bin/python3', f'{homepath}/Sonet/SoNodeServer/manage.py', 'migrate'],
     ['sudo', '-S', 'chmod', '-R', '755', f'/Users/{username}/Sonet/.data/logs'],
     ['sudo', '-S', 'chmod', '-R', '755', f'/Users/{username}/Sonet/.data/supervisor'],

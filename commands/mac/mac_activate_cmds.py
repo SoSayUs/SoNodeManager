@@ -147,8 +147,6 @@ def run_setup_firewall(output=None, remote_cmd=False):
 
 def activate_cloudflare_service(output=None, remote_cmd=False):
     print('-run_activate_cloudflare')
-    import os
-    import subprocess
     from pathlib import Path
     get_variables()
     global operatorData
@@ -286,6 +284,511 @@ def activate_cloudflare_service(output=None, remote_cmd=False):
                 update_output(f"config.yml not found. Tunnel not created.", output)
                 raise Exception('Tunnel not created')
 
+def setup_llm(output=None, remote_cmd=False, systemPass=None):
+    print('-setup_llm')
+    import sys
+    import urllib.request
+    from pathlib import Path
+
+    def ensure_xcode_clt(sudo_password: str | None = None) -> bool:
+        print('-ensure_xcode_clt')
+        """
+        Check for Xcode Command Line Tools (needed for the C/C++ compiler and
+        macOS SDK headers that the Metal build requires). Installs them
+        automatically if missing.
+
+        This is the ONE step in the whole setup that can require sudo --
+        `softwareupdate -i` needs elevated privileges to install CLT headlessly.
+        (Plain `xcode-select --install` only pops a GUI dialog, which can't be
+        driven from a script, so we go through `softwareupdate` instead.)
+
+        If CLT is already installed, this is a no-op and sudo_password is
+        never touched. If CLT is missing and no sudo_password is provided,
+        raises RuntimeError rather than silently prompting.
+        """
+        check = subprocess.run(
+            ["xcode-select", "-p"], capture_output=True, text=True
+        )
+        if check.returncode == 0:
+            print(f"Xcode Command Line Tools already installed at {check.stdout.strip()}.")
+            return True
+
+        print("Xcode Command Line Tools not found. Installing (requires sudo)...")
+        if not sudo_password:
+            raise RuntimeError(
+                "Xcode Command Line Tools are missing and no sudo_password was "
+                "provided to run_setup(). Pass sudo_password='...' or install "
+                "manually with: xcode-select --install"
+            )
+
+        marker = Path("/tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress")
+        marker.touch()
+        try:
+            listing = subprocess.run(
+                ["softwareupdate", "-l"], capture_output=True, text=True, check=True
+            )
+            product_lines = [
+                line.strip().lstrip("* ").strip()
+                for line in listing.stdout.splitlines()
+                if "Command Line Tools" in line and line.strip().startswith("*")
+            ]
+            if not product_lines:
+                raise RuntimeError(
+                    "softwareupdate didn't list a Command Line Tools package. "
+                    "Install manually with: xcode-select --install"
+                )
+            product_name = product_lines[-1]
+            print(f"Installing: {product_name}")
+
+            install = subprocess.run(
+                ["sudo", "-S", "softwareupdate", "-i", product_name, "--verbose"],
+                input=sudo_password + "\n",
+                text=True,
+                capture_output=True,
+            )
+            if install.returncode != 0:
+                raise RuntimeError(
+                    f"CLT install failed:\n{install.stdout}\n{install.stderr}"
+                )
+            print("Xcode Command Line Tools installed.")
+        finally:
+            if marker.exists():
+                marker.unlink()
+
+        return True
+
+    def run_setup(
+            venv_dir: str = "~/Sonet/.data/env",
+            model_dir: str = "~/Sonet/.data/models",
+            model_url: str = (
+                "https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF/"
+                "resolve/main/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
+            ),
+            force_reinstall: bool = False,
+            sudo_password=None,
+        ) -> dict:
+        print('-run_setup')
+        """
+        Fully automated setup: ensures Xcode Command Line Tools are present,
+        creates a venv (if it doesn't already exist), builds llama-cpp-python
+        with Metal support, and downloads a default GGUF model if one isn't
+        present.
+
+        sudo is ONLY used for installing Xcode Command Line Tools, and only if
+        they're not already present. Everything else -- venv creation, pip
+        install, model download -- is user-space and never touches sudo.
+        Pass sudo_password="..." if CLT might not be installed yet; if CLT is
+        already present, sudo_password is never used.
+
+        Returns a dict with resolved paths: venv_dir, python_bin, model_path.
+        """
+        ensure_xcode_clt(sudo_password=sudo_password)
+
+        venv_path = Path(venv_dir).expanduser()
+        model_path_dir = Path(model_dir).expanduser()
+        model_path_dir.mkdir(parents=True, exist_ok=True)
+
+        venv_python = venv_path / "bin" / "python"
+        venv_pip = venv_path / "bin" / "pip"
+
+        # 1. Create venv only if it doesn't already have a python binary
+        #    (your pyenv-managed venv at ~/Sonet/.data/env is reused as-is)
+        if not venv_python.exists():
+            print(f"Creating venv at {venv_path}...")
+            subprocess.run([sys.executable, "-m", "venv", str(venv_path)], check=True)
+        else:
+            print(f"venv already exists at {venv_path}, reusing it.")
+
+        # 2. Install/build llama-cpp-python with Metal acceleration
+        print("Installing llama-cpp-python with Metal support (this can take a few minutes)...")
+        env = os.environ.copy()
+        env["CMAKE_ARGS"] = "-DGGML_METAL=on"
+
+        pip_cmd = [str(venv_pip), "install", "--no-cache-dir"]
+        if force_reinstall:
+            pip_cmd.append("--force-reinstall")
+        pip_cmd.append("llama-cpp-python")
+
+        subprocess.run(pip_cmd, check=True, env=env)
+
+        # 3. Download the model if not already present
+        model_filename = model_url.split("/")[-1]
+        model_path = model_path_dir / model_filename
+
+        if not model_path.exists():
+            print(f"Downloading model to {model_path}...")
+            update_output(f'Downloading model to {model_path}...', output)
+            _download_with_progress(model_url, model_path)
+        else:
+            print(f"Model already present at {model_path}, skipping download.")
+
+        print("Setup complete.")
+        return {
+            "venv_dir": str(venv_path),
+            "python_bin": str(venv_python),
+            "model_path": str(model_path),
+        }
+
+    def _download_with_progress(url: str, dest: Path, output=None) -> None:
+        def _report(block_num, block_size, total_size):
+            if total_size > 0:
+                downloaded = block_num * block_size
+                pct = min(downloaded / total_size * 100, 100)
+                print(f"\r  {pct:5.1f}%", end="", flush=True)
+                update_output(f"\r  {pct:5.1f}%", output, replace=True)
+        
+
+        urllib.request.urlretrieve(url, dest, reporthook=_report)
+        print()  # newline after progress
+        update_output('Download complete', output, replace=True)
+
+    # Uses ~/Sonet/.data/env by default -- pass venv_dir="..." to override.
+    paths = run_setup(sudo_password=systemPass, model_url="https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-1M-GGUF/resolve/main/Qwen2.5-7B-Instruct-1M-Q5_K_M.gguf?download=true")
+    print(f"\nvenv python: {paths['python_bin']}")
+    print(f"model path:  {paths['model_path']}")
+    print(
+        "\nNote: run queries using the venv's Python interpreter, e.g.:\n"
+        f"  {paths['python_bin']} -c \"from llama_setup import query_llama; "
+        f"print(query_llama('hi', model_path='{paths['model_path']}'))\""
+    )
+
+def setup_llm3(output=None, remote_cmd=False, systemPass=None):
+    """
+    Automated setup + query for llama.cpp (via llama-cpp-python) on macOS with Metal acceleration.
+
+    Usage:
+        from llama_setup import run_setup, query_llama
+
+        paths = run_setup()
+        answer = query_llama("Hello, how are you?", model_path=paths["model_path"])
+    """
+
+    import os
+    import subprocess
+    import sys
+    import urllib.request
+    from pathlib import Path
+
+
+    def ensure_xcode_clt(sudo_password: str | None = None) -> bool:
+        """
+        Check for Xcode Command Line Tools (needed for the C/C++ compiler and
+        macOS SDK headers that the Metal build requires). Installs them
+        automatically if missing.
+
+        This is the ONE step in the whole setup that can require sudo --
+        `softwareupdate -i` needs elevated privileges to install CLT headlessly.
+        (Plain `xcode-select --install` only pops a GUI dialog, which can't be
+        driven from a script, so we go through `softwareupdate` instead.)
+
+        If CLT is already installed, this is a no-op and sudo_password is
+        never touched. If CLT is missing and no sudo_password is provided,
+        raises RuntimeError rather than silently prompting.
+        """
+        check = subprocess.run(
+            ["xcode-select", "-p"], capture_output=True, text=True
+        )
+        if check.returncode == 0:
+            print(f"Xcode Command Line Tools already installed at {check.stdout.strip()}.")
+            return True
+
+        print("Xcode Command Line Tools not found. Installing (requires sudo)...")
+        if not sudo_password:
+            raise RuntimeError(
+                "Xcode Command Line Tools are missing and no sudo_password was "
+                "provided to run_setup(). Pass sudo_password='...' or install "
+                "manually with: xcode-select --install"
+            )
+
+        marker = Path("/tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress")
+        marker.touch()
+        try:
+            listing = subprocess.run(
+                ["softwareupdate", "-l"], capture_output=True, text=True, check=True
+            )
+            product_lines = [
+                line.strip().lstrip("* ").strip()
+                for line in listing.stdout.splitlines()
+                if "Command Line Tools" in line and line.strip().startswith("*")
+            ]
+            if not product_lines:
+                raise RuntimeError(
+                    "softwareupdate didn't list a Command Line Tools package. "
+                    "Install manually with: xcode-select --install"
+                )
+            product_name = product_lines[-1]
+            print(f"Installing: {product_name}")
+
+            install = subprocess.run(
+                ["sudo", "-S", "softwareupdate", "-i", product_name, "--verbose"],
+                input=sudo_password + "\n",
+                text=True,
+                capture_output=True,
+            )
+            if install.returncode != 0:
+                raise RuntimeError(
+                    f"CLT install failed:\n{install.stdout}\n{install.stderr}"
+                )
+            print("Xcode Command Line Tools installed.")
+        finally:
+            if marker.exists():
+                marker.unlink()
+
+        return True
+
+
+    def run_setup(
+        venv_dir: str = "~/Sonet/.data/env",
+        model_dir: str = "~/models",
+        model_url: str = (
+            "https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF/"
+            "resolve/main/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
+        ),
+        force_reinstall: bool = False,
+        sudo_password: str | None = None,
+    ) -> dict:
+        """
+        Fully automated setup: ensures Xcode Command Line Tools are present,
+        creates a venv (if it doesn't already exist), builds llama-cpp-python
+        with Metal support, and downloads a default GGUF model if one isn't
+        present.
+
+        sudo is ONLY used for installing Xcode Command Line Tools, and only if
+        they're not already present. Everything else -- venv creation, pip
+        install, model download -- is user-space and never touches sudo.
+        Pass sudo_password="..." if CLT might not be installed yet; if CLT is
+        already present, sudo_password is never used.
+
+        Returns a dict with resolved paths: venv_dir, python_bin, model_path.
+        """
+        ensure_xcode_clt(sudo_password=sudo_password)
+
+        venv_path = Path(venv_dir).expanduser()
+        model_path_dir = Path(model_dir).expanduser()
+        model_path_dir.mkdir(parents=True, exist_ok=True)
+
+        venv_python = venv_path / "bin" / "python"
+        venv_pip = venv_path / "bin" / "pip"
+
+        # 1. Create venv only if it doesn't already have a python binary
+        #    (your pyenv-managed venv at ~/Sonet/.data/env is reused as-is)
+        if not venv_python.exists():
+            print(f"Creating venv at {venv_path}...")
+            subprocess.run([sys.executable, "-m", "venv", str(venv_path)], check=True)
+        else:
+            print(f"venv already exists at {venv_path}, reusing it.")
+
+        # 2. Install/build llama-cpp-python with Metal acceleration
+        print("Installing llama-cpp-python with Metal support (this can take a few minutes)...")
+        env = os.environ.copy()
+        env["CMAKE_ARGS"] = "-DGGML_METAL=on"
+
+        pip_cmd = [str(venv_pip), "install", "--no-cache-dir"]
+        if force_reinstall:
+            pip_cmd.append("--force-reinstall")
+        pip_cmd.append("llama-cpp-python")
+
+        subprocess.run(pip_cmd, check=True, env=env)
+
+        # 3. Download the model if not already present
+        model_filename = model_url.split("/")[-1]
+        model_path = model_path_dir / model_filename
+
+        if not model_path.exists():
+            print(f"Downloading model to {model_path}...")
+            update_output(f'Downloading model to {model_path}...', output)
+            _download_with_progress(model_url, model_path, output=output)
+        else:
+            print(f"Model already present at {model_path}, skipping download.")
+
+        print("Setup complete.")
+        return {
+            "venv_dir": str(venv_path),
+            "python_bin": str(venv_python),
+            "model_path": str(model_path),
+        }
+
+
+    def _download_with_progress(url: str, dest: Path, output=None) -> None:
+        def _report(block_num, block_size, total_size):
+            if total_size > 0:
+                downloaded = block_num * block_size
+                pct = min(downloaded / total_size * 100, 100)
+                print(f"\r  {pct:5.1f}%", end="", flush=True)
+                update_output(f"\r  {pct:5.1f}%", output, replace=True)
+                
+
+        urllib.request.urlretrieve(url, dest, reporthook=_report)
+        print()  # newline after progress
+        update_output('Download complete', output, replace=True)
+
+    def query_llama(
+        prompt: str,
+        model_path: str,
+        n_ctx: int = 4096,
+        n_gpu_layers: int = -1,
+        max_tokens: int = 512,
+    ) -> str:
+        """
+        Run a single query against the given GGUF model.
+        Must be called from within the venv created by run_setup()
+        (i.e. run this script with the venv's python, or install
+        llama-cpp-python into your current interpreter).
+        n_gpu_layers=-1 offloads all layers to Metal GPU.
+        """
+        from llama_cpp import Llama  # imported here so run_setup() works before install
+
+        llm = Llama(
+            model_path=model_path,
+            n_ctx=n_ctx,
+            n_gpu_layers=n_gpu_layers,
+            verbose=False,
+        )
+        output = llm.create_chat_completion(
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=max_tokens,
+        )
+        return output["choices"][0]["message"]["content"]
+
+
+    # if __name__ == "__main__":
+    # Uses ~/Sonet/.data/env by default -- pass venv_dir="..." to override.
+    paths = run_setup(sudo_password=systemPass)
+    print(f"\nvenv python: {paths['python_bin']}")
+    print(f"model path:  {paths['model_path']}")
+    print(
+        "\nNote: run queries using the venv's Python interpreter, e.g.:\n"
+        f"  {paths['python_bin']} -c \"from llama_setup import query_llama; "
+        f"print(query_llama('hi', model_path='{paths['model_path']}'))\""
+    )
+
+def setup_llm_old(output=None, remote_cmd=False):
+    import sys
+    import urllib.request
+    from pathlib import Path
+
+    def install_cpp(
+        venv_dir: str = "~/.venvs/llama",
+        model_dir: str = "~/models",
+        model_url: str = (
+            "https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF/"
+            "resolve/main/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
+        ),
+        force_reinstall: bool = False,
+    ) -> dict:
+        """
+        Fully automated setup: creates a venv, builds llama-cpp-python with Metal
+        support, and downloads a default GGUF model if one isn't present.
+
+        Returns a dict with resolved paths: venv_dir, python_bin, model_path.
+        """
+        venv_path = Path(venv_dir).expanduser()
+        model_path_dir = Path(model_dir).expanduser()
+        model_path_dir.mkdir(parents=True, exist_ok=True)
+
+        # 1. Create venv if it doesn't exist
+        if not venv_path.exists():
+            print(f"Creating venv at {venv_path}...")
+            subprocess.run([sys.executable, "-m", "venv", str(venv_path)], check=True)
+        else:
+            print(f"venv already exists at {venv_path}, reusing it.")
+
+        venv_python = venv_path / "bin" / "python"
+        venv_pip = venv_path / "bin" / "pip"
+
+        # 2. Install/build llama-cpp-python with Metal acceleration
+        print("Installing llama-cpp-python with Metal support (this can take a few minutes)...")
+        env = os.environ.copy()
+        env["CMAKE_ARGS"] = "-DGGML_METAL=on"
+
+        pip_cmd = [str(venv_pip), "install", "--no-cache-dir"]
+        if force_reinstall:
+            pip_cmd.append("--force-reinstall")
+        pip_cmd.append("llama-cpp-python")
+
+        subprocess.run(pip_cmd, check=True, env=env)
+
+        # 3. Download the model if not already present
+        model_filename = model_url.split("/")[-1]
+        model_path = model_path_dir / model_filename
+
+        if not model_path.exists():
+            print(f"Downloading model to {model_path}...")
+            update_output(f'Downloading model to {model_path}...', output)
+            _download_with_progress(model_url, model_path, output=output)
+        else:
+            print(f"Model already present at {model_path}, skipping download.")
+
+        print("Setup complete.")
+        return {
+            "venv_dir": str(venv_path),
+            "python_bin": str(venv_python),
+            "model_path": str(model_path),
+        }
+
+
+    def _download_with_progress(url: str, dest: Path, output=None) -> None:
+        def _report(block_num, block_size, total_size):
+            if total_size > 0:
+                downloaded = block_num * block_size
+                pct = min(downloaded / total_size * 100, 100)
+                print(f"\r  {pct:5.1f}%", end="", flush=True)
+                update_output(f"\r  {pct:5.1f}%", output, replace=True)
+                
+
+        urllib.request.urlretrieve(url, dest, reporthook=_report)
+        print()  # newline after progress
+
+
+    def query_llama(
+        prompt: str,
+        model_path: str,
+        n_ctx: int = 4096,
+        n_gpu_layers: int = -1,
+        max_tokens: int = 512,
+    ) -> str:
+        """
+        Run a single query against the given GGUF model.
+        Must be called from within the venv created by run_setup()
+        (i.e. run this script with the venv's python, or install
+        llama-cpp-python into your current interpreter).
+        n_gpu_layers=-1 offloads all layers to Metal GPU.
+        """
+        from llama_cpp import Llama  # imported here so run_setup() works before install
+
+        llm = Llama(
+            model_path=model_path,
+            n_ctx=n_ctx,
+            n_gpu_layers=n_gpu_layers,
+            verbose=False,
+        )
+        output = llm.create_chat_completion(
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=max_tokens,
+        )
+        return output["choices"][0]["message"]["content"]
+
+    paths = install_cpp(
+        model_url="https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-1M-GGUF/resolve/main/qwen2.5-7b-instruct-1m-q5_k_m.gguf"
+    )
+    # paths = install_cpp()
+    print(f"\nvenv python: {paths['python_bin']}")
+    print(f"model path:  {paths['model_path']}")
+    print(
+        "\nNote: run queries using the venv's Python interpreter, e.g.:\n"
+        f"  {paths['python_bin']} -c \"from llama_setup import query_llama; "
+        f"print(query_llama('hi', model_path='{paths['model_path']}'))\""
+    )
+
+def intelligence_check(output=None, remote_cmd=False):
+    get_variables()
+    global node_data
+    global systemPass
+    if node_data['settings']['node_type'].lower() == 'intelligence':
+        update_output('Setting up LLM...', output)
+        setup_llm(output=output, remote_cmd=remote_cmd, systemPass=systemPass)
+        update_output('Done setting up LLM', output)
+
 def declare_active(output=None, remote_cmd=False):
     from commands.utils import declare_self_active
     return declare_self_active(True, output=output, wait_for_reload=False, broadcast_to_network=True, remote_cmd=remote_cmd)
@@ -323,6 +826,7 @@ special_commands = [
     {'cmd':'run_config_supervisor', 'reqs':'output_display'},
     {'cmd':'run_write_supervisor_plist', 'reqs':'output_display'},
     {'cmd':'activate_cloudflare_service', 'reqs':'output_display'},
+    {'cmd':'intelligence_check', 'reqs':'output_display'},
     {'cmd':'pause'},
     {'cmd':'declare_active', 'reqs':'output_display'},
     {'cmd':'force_active', 'reqs':'output_display'},
@@ -375,6 +879,7 @@ action_cmds = [
     ['/bin/sleep', '2'],
     ['launchctl', 'bootstrap', f'gui/{uid}', f'/Users/{username}/Library/LaunchAgents/com.sonet.supervisor.plist'],
     ['sudo', '-S', 'launchctl', 'bootstrap', 'system', '/Library/LaunchDaemons/homebrew.mxcl.postgresql.plist'],
+    ['run_command', 'intelligence_check'],
     ['run_command', 'pause'],
     ['echo', 'Finished!'],
 ]

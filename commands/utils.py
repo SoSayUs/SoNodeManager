@@ -234,7 +234,8 @@ def is_id(obj):
     # prefix = plugin num + 2 to 3 class chars followed by "So"
     max_length = 35 # includes ID_LENGTH of 25 - does not include prefix
     min_length = 13 # includes ID_LENGTH of 10 - does not include prefix
-    if isinstance(obj, str) and 'So' in obj[:10] and any(obj[i:i+2] == 'So' and obj[i+2:].isalnum() and min_length <= len(obj[i+2:]) <= max_length for i in range(10)):
+    if isinstance(obj, str) and 'So' in obj[1:10] and obj.replace('So', '', 1).isalnum() and any(obj[i:i+2] == 'So' and min_length <= len(obj[i+2:]) <= max_length for i in range(2, 11)):
+    # if isinstance(obj, str) and 'So' in obj[:10] and any(obj[i:i+2] == 'So' and obj[i+2:].isalnum() and min_length <= len(obj[i+2:]) <= max_length for i in range(10)):
         return True
     return False
 
@@ -404,7 +405,7 @@ def get_or_create_node_obj(operatorData=None, new_node=None, register_data=True,
                         err = 5
 
                         node_name = new_node['settings']['node_name']
-                        new_node['settings']['node_type'] = 'server/maintainer'
+                        new_node['settings']['node_type'] = 'auto'
                         new_node['settings']['node_level'] = 'standard'
 
                         if not objModel_sign['created']:
@@ -435,6 +436,7 @@ def get_or_create_node_obj(operatorData=None, new_node=None, register_data=True,
 
                         walletModel_sign['created'] = dt_to_string(now)
                         walletModel_sign['User_obj'] = user_id
+                        walletModel_sign['networkChain'] = user_id
                         walletModel_sign['Name'] = f'Rewards-{new_node_id}'
 
                         address = new_node['settings']['address']
@@ -548,7 +550,7 @@ def get_node_list(operatorData=None, target='master', self_node={}, exclude_self
         nodes = get_node_list(operatorData=operatorData)
         for iden, ip in nodes.items():
             try:
-                r = connect_to_node(ip, 'network/get_current_node_list', operatorData=operatorData, timeout=10, get=True)
+                r = connect_to_node(ip, f'network/get_current_node_list/{target}', operatorData=operatorData, timeout=10, get=True)
                 if r and r.status_code == 200:
                     r_json = r.json()
                     print('r_json',r_json)
@@ -556,8 +558,11 @@ def get_node_list(operatorData=None, target='master', self_node={}, exclude_self
                         refresh_result = True
                         node_data = json.loads(r_json['node_data'])
                         node_addresses = json.loads(r_json['node_addresses'])
-                        operatorData['node_list'] = {'lastUpdate' : dt_to_string(now_utc()), 'node_data' : node_data, 'addresses':node_addresses}
-                        operatorData['ip_master_list'] = node_addresses
+                        if not operatorData.get('node_list', None):
+                            operatorData['node_list'] = {}
+                        operatorData['node_list'][target] = {'lastUpdate' : dt_to_string(now_utc()), 'node_data' : node_data, 'addresses':node_addresses}
+                        if target == 'master':
+                            operatorData['ip_master_list'] = node_addresses
                         write_remote_opData(operatorData)
                         break
                 else:
@@ -568,38 +573,42 @@ def get_node_list(operatorData=None, target='master', self_node={}, exclude_self
         if self_node and 'created' in self_node and string_to_dt(self_node['created']) < now_utc() - datetime.timedelta(minutes=10) and 'seed_ip' in operatorData: # only contact seed_node until self_node has been shared with network by seed_node
             nodes = {'seed_ip' : operatorData['seed_ip']}
         elif target == 'master' and 'ip_master_list' in operatorData:
+            print('master')
             nodes = operatorData['ip_master_list']
-            if exclude_relays and 'node_list' in operatorData and 'node_data' in operatorData['node_list']:
+            if exclude_relays and 'node_list' in operatorData and 'node_data' in operatorData['node_list'][[target]]:
                 if isinstance(nodes, list):
-                    nodes = {n['address'][:n['address'].find('.')]:n for n in nodes if n['address'][:n['address'].find('.')] not in operatorData['node_list']['node_data']['relay']}
+                    nodes = {n['address'][:n['address'].find('.')]:n for n in nodes if n['address'][:n['address'].find('.')] not in operatorData['node_list']['master']['node_data']['relay']}
                 else:
-                    nodes = {iden:addr for iden, addr in nodes.items() if iden not in operatorData['node_list']['node_data']['relay']}
+                    nodes = {iden:addr for iden, addr in nodes.items() if iden not in operatorData['node_list']['master']['node_data']['relay']}
         elif isinstance(target, dict) and 'node_list' in operatorData and 'node_data' in operatorData['node_list']:
+            print('category')
             target={'category':'abilities', 'sub_cat':'cloudflare'}
-            if target['category'] in operatorData['node_list']['node_data'] and target['sub_cat'] in operatorData['node_list']['node_data'][target['category']]:
-                node_ids = operatorData['node_list']['node_data'][target['category']][target['sub_cat']]
+            if target['category'] in operatorData['node_list']['master']['node_data'] and target['sub_cat'] in operatorData['node_list']['master']['node_data'][target['category']]:
+                node_ids = operatorData['node_list']['master']['node_data'][target['category']][target['sub_cat']]
                 if isinstance(node_ids, list):
-                    nodes = {iden:operatorData['node_list']['addresses'][iden] for iden in operatorData['node_list']['node_data'][target['category']][target['sub_cat']] if iden in node_ids}
+                    nodes = {iden:operatorData['node_list']['master']['addresses'][iden] for iden in operatorData['node_list']['master']['node_data'][target['category']][target['sub_cat']] if iden in node_ids}
                 else:
-                    nodes = {iden:addr for iden, addr in operatorData['node_list']['addresses'].items() if iden in node_ids}
+                    nodes = {iden:addr for iden, addr in operatorData['node_list']['master']['addresses'].items() if iden in node_ids}
                 if exclude_relays:
-                    nodes = {iden:addr for iden, addr in nodes.items() if iden not in operatorData['node_list']['node_data']['relay']}
-        elif 'node_list' in operatorData and target in operatorData['node_list']['node_data']:
-            node_ids = operatorData['node_list']['node_data'][target]['server']
+                    nodes = {iden:addr for iden, addr in nodes.items() if iden not in operatorData['node_list']['master']['node_data']['relay']}
+        elif 'node_list' in operatorData and target in operatorData['node_list']:
+            print('target found')
+            node_ids = operatorData['node_list'][target]['node_data']['maintainer']
             if isinstance(node_ids, list):
-                addresses = operatorData['node_list']['addresses']
+                addresses = operatorData['node_list'][target]['addresses']
                 nodes = {iden:addresses[iden] for iden in node_ids}
             else:
                 nodes = {iden:addr for iden, addr in operatorData['node_list']['addresses'].items() if iden in node_ids}
             if exclude_relays:
-                nodes = {iden:addr for iden, addr in nodes.items() if iden not in operatorData['node_list']['node_data']['relay']}
+                nodes = {iden:addr for iden, addr in nodes.items() if iden not in operatorData['node_list']['master']['node_data']['relay']}
         elif 'ip_master_list' in operatorData:
+            print('fallback')
             nodes = operatorData['ip_master_list']
             if exclude_relays and 'node_list' in operatorData and 'node_data' in operatorData['node_list']:
                 if isinstance(nodes, list):
                     nodes = {addr[:addr.find('.')]:addr for addr in nodes if addr[:addr.find('.')] not in operatorData['node_list']['node_data']['relay']}
                 else:
-                    nodes = {iden:addr for iden, addr in nodes.items() if iden not in operatorData['node_list']['node_data']['relay']}
+                    nodes = {iden:addr for iden, addr in nodes.items() if iden not in operatorData['node_list']['master']['node_data']['relay']}
         else:
             nodes = {}
     except Exception as e:
@@ -932,8 +941,8 @@ def declare_self_active(activate, output=None, operatorData=None, wait_for_reloa
 
         broadcast_json = None
         if full_nodeData['nodeData']['node_level'] == 'super':
-            print('sign with super keys')
             temp_keys = fetch_secure_item('temp_keys')
+            print('sign with super keys', temp_keys)
             signedData = sign(full_nodeData['nodeData'], privKey=temp_keys['privKey'], pubKey=temp_keys['pubKey'], operatorData=operatorData, verify_result=True, remove_skip_fields=True)
         else:
             print('sign with node keys')
@@ -1225,6 +1234,7 @@ def sync_database(output=None, SetupScreen=None, seed=False, total_sync=False):
                         return False
                     if response and response.status_code == 200:
                         received_json = response.json()
+                        print('received_json1111',str(received_json)[:500])
                         if received_json['message'] == 'Success':
                             if received_json['type'] == 'Blockchain':
                                 print('is chain')
@@ -1718,7 +1728,7 @@ def sync_database(output=None, SetupScreen=None, seed=False, total_sync=False):
         sync_node_address = []
         if remote_data['local_address'] and remote_data['port']:
             sync_node_address.append(f"{remote_data['local_address']}:{fullNode_data['settings']['port']}")
-        if remote_data['remote_address'] and remote_data['remote_port']:
+        if remote_data.get('remote_address', None) and remote_data['remote_port']:
             sync_node_address.append(f"{fullNode_data['settings']['address']}")
         if 'address' in full_nodeData['settings'] and full_nodeData['settings']['address']:
             sync_node_address.append(full_nodeData['settings']['address'])
@@ -1741,27 +1751,27 @@ def sync_database(output=None, SetupScreen=None, seed=False, total_sync=False):
         if cont:
             network_contacted = True
             cont = run_data_task('Sonet')
-        # if cont:
-        #     cont = run_data_task('Node', check_for_latest=False)
-        # if cont:
-        #     cont = run_data_task('Plugin')
+        if cont:
+            cont = run_data_task('Node', check_for_latest=False)
+        if cont:
+            cont = run_data_task('Plugin')
                         
-        # if 'node_type' not in full_nodeData['settings']:
-        #     full_nodeData['settings']['node_type'] = 'server/maintainer'
-        # if 'start_local_install' in operatorData:
-        #     del operatorData['start_local_install']
-        #     write_remote_opData(operatorData, update_remote=True)
+        if 'node_type' not in full_nodeData['settings']:
+            full_nodeData['settings']['node_type'] = 'auto'
+        if 'start_local_install' in operatorData:
+            del operatorData['start_local_install']
+            write_remote_opData(operatorData, update_remote=True)
         
-        # if cont:
-        #     cont = run_chain_task('Nodes-Blocks')
-        # if cont:
-        #     cont = run_chain_task('Sonet-Blocks')
-        # if cont:
-        #     cont = run_chain_task('Accounts-Blocks')
-        # if cont:
-        #     cont = run_chain_task('Keys-Blocks')
-        # if cont:
-        #     cont = run_chain_task('User_Blocks')
+        if cont:
+            cont = run_chain_task('Nodes-Blocks')
+        if cont:
+            cont = run_chain_task('Sonet-Blocks')
+        if cont:
+            cont = run_chain_task('Accounts-Blocks')
+        if cont:
+            cont = run_chain_task('Keys-Blocks')
+        if cont:
+            cont = run_chain_task('User_Blocks')
         if cont:
             cont = run_data_task('Region')
 
@@ -1818,7 +1828,8 @@ def sync_database(output=None, SetupScreen=None, seed=False, total_sync=False):
                     SetupScreen.parent_screen.job_running = False
                     return False
                 if cont and genesisId.startswith('reg'):
-                    nodes = get_node_list(operatorData=operatorData, target=genesisId, exclude_self=True)
+                    # nodes = get_node_list(operatorData=operatorData, target=genesisId, exclude_self=True)
+                    nodes, operatorData, network_contacted = get_node_list(operatorData=operatorData, target=genesisId, self_node=fullNode_data, refresh_list=True, return_refresh_result=True, exclude_self=True)
                     print('nodes::',nodes)
                     if nodes:
                         try:
@@ -1835,8 +1846,9 @@ def sync_database(output=None, SetupScreen=None, seed=False, total_sync=False):
                         SetupScreen.parent_screen.job_running = False
                         return False
                     if cont and genesisId.startswith('reg'):
-                        nodes = get_node_list(operatorData=operatorData, target=genesisId, exclude_self=True)
-                        print('nodes::',nodes)
+                        # nodes = get_node_list(operatorData=operatorData, target=genesisId, exclude_self=True)
+                        nodes, operatorData, network_contacted = get_node_list(operatorData=operatorData, target=genesisId, self_node=fullNode_data, refresh_list=True, return_refresh_result=True, exclude_self=True)
+                        print('nodes:::',nodes)
                         if nodes:
                             try:
                                 cont = run_chain_task(genesisId+'-Blocks', node_list=nodes, target_node=None)
@@ -1845,9 +1857,13 @@ def sync_database(output=None, SetupScreen=None, seed=False, total_sync=False):
                                 update_output(f'error 4: {e}\n', output)
         
         if cont and 'maintainer' in full_nodeData['settings']['node_type']:
+
+            if cont:
+                cont = run_data_task('Wallet')
             # operatorData['myNodes'][operatorData['local_nodeId']]['meta']['do_not_sync_block_content'] = True
             # write_remote_opData(operatorData, update_remote=True)
-            cont = run_chain_task('Wallet_Blocks')
+            if cont:
+                cont = run_chain_task('Wallet_Blocks')
             # del operatorData['myNodes'][operatorData['local_nodeId']]['meta']['do_not_sync_block_content']
             # operatorData['myNodes'][operatorData['local_nodeId']]['meta']['do_sync_block_content'] = True
             # write_remote_opData(operatorData, update_remote=True)
@@ -2012,7 +2028,7 @@ def generate_strong_password(length=32):
     random.shuffle(password)
     return ''.join(password)
 
-def pull_git_server(output=None, operatorData=None):
+def pull_git_server(output=None, operatorData=None, install=False):
     print('-pull_git_server')
     operatorData = get_operatorData(operatorData)
     device_system = get_device_system()
@@ -2030,8 +2046,8 @@ def pull_git_server(output=None, operatorData=None):
         
         package_manager = get_package_manager()
         git_repo = f"{repo}/SoNodeServer"
-        remote_url = f"https://github.com:{git_repo}.git"
-        remote_url = "https://github.com/SoSayUs/SoNodeServer.git"
+        remote_url = f"https://github.com/{git_repo}.git"
+        # remote_url = "https://github.com/SoSayUs/SoNodeServer.git"
         commands = []
 
         git_path = shutil.which("git")
@@ -2078,7 +2094,7 @@ def pull_git_server(output=None, operatorData=None):
         remote_commit = get_remote_commit(git_path, remote_url, branch)
         local_commit = get_local_commit(git_path, project_path) if os.path.exists(os.path.join(project_path, ".git")) else None
 
-        if remote_commit == False or local_commit == None:
+        if remote_commit == False or local_commit == None or install:
             # git or project not installed
             commands = [
                 ["mkdir", homepath + "/Sonet"],
@@ -2108,7 +2124,12 @@ def pull_git_server(output=None, operatorData=None):
                 commands.append([git_path, "-C", project_path, "reset", "--hard", "FETCH_HEAD"])
                 commands.append([git_path, "-C", project_path, "clean", "-fd"])  # wipe any stray untracked files
             else:
+                if os.path.exists(project_path):
+                    commands.append(["sudo", "-S", "rm", "-rf", project_path])
+                    commands.append(['/bin/sleep', '2'])
                 commands.append([git_path, "clone", "--branch", branch, "--depth", "1", remote_url, project_path])
+                # commands.append([git_path, "clone", "--branch", branch, "--depth", "1", remote_url, project_path])
+    
 
         else:
             print("Already up to date, no restart needed.")
@@ -2116,10 +2137,11 @@ def pull_git_server(output=None, operatorData=None):
 
     except Exception as e:
         print('git fail', str(e))
+    print('commands',commands)
     if commands:
         password = fetch_secure_item("sysPass")
         for cmd in commands:
-            print('cmd',cmd)
+            print('cmd', cmd)
             update_output(cmd, output)
             result = subprocess.run(
                 cmd,
@@ -2128,7 +2150,12 @@ def pull_git_server(output=None, operatorData=None):
                 stderr=subprocess.PIPE,
             )
             content = f"{result.stdout.decode()}\n"
-            update_output(content.replace(password, '*****'), output)
+            # print('content',content)
+            update_output(content.replace(password, '*****').replace('\n', ''), output)
+            # if result.returncode != 0:
+            #     err = result.stderr.decode().replace(password, '*****')
+            #     out = result.stdout.decode().replace(password, '*****')
+            #     update_output(f"CMD FAILED rc={result.returncode}\nSTDOUT:{out}\nSTDERR:{err}\n", output)
 
         with open(homepath + "/Sonet/.data/special/cors.conf", "w") as f:
             f.write("map $http_origin $cors_origin {\n")
@@ -2670,7 +2697,7 @@ def adjust_settings(nodeData=None, node_data=None, clear_data=False, output=None
 
         # import json
         from pathlib import Path
-        filename = Path.home() / "Sonet" / "SoNodeServer" / "static_cdn" / "manifest.json"
+        filename = Path.home() / "Sonet" / "SoNodeServer" / "static" / "manifest.json"
 
         with filename.open("r", encoding="utf-8") as f:
             manifest_dict = json.load(f)
@@ -2896,34 +2923,39 @@ def fetch_django_secret_key(output=None, node_data=None, node_id=None, operatorD
         operatorData['myNodes'][node_id] = node_data
         write_operatorData(operatorData)
     else:
-        lines = output.split('\n')
-        position = -1
-        runs = 0
-        key_found = False
-        while runs < 40 and key_found == False:
-            runs += 1
-            secret_key = lines[position]
-            print('secret_key?',position,secret_key)
-            if 'key:' in secret_key and 'get_random_secret_key' not in secret_key:
-                x = secret_key.find('key:')+4
-                secret_key = secret_key[x:].strip()
-                key_found = True
-            position -= 1
-        print('secret_key_found:',secret_key)
-        if not key_found:
+        try:
+            lines = output.split('\n')
+            position = -1
+            runs = 0
+            key_found = False
+            while runs < 40 and key_found == False:
+                runs += 1
+                secret_key = lines[position]
+                print('secret_key?',position,secret_key)
+                if 'key:' in secret_key and 'get_random_secret_key' not in secret_key:
+                    x = secret_key.find('key:')+4
+                    secret_key = secret_key[x:].strip()
+                    key_found = True
+                position -= 1
+            print('secret_key_found:',secret_key)
+            if not key_found:
+                update_output("Failed to create django secret key. Please restart.", output)
+                raise RuntimeError("Failed to create django secret key.")
+
+            operatorData = get_operatorData(operatorData)
+            if 'myNodes' in operatorData:
+                for node in operatorData['myNodes']:
+                    if 'new_install' in node:
+                        if 'meta' not in operatorData['myNodes'][node]:
+                            operatorData['myNodes'][node]['meta'] = {}
+                        operatorData['myNodes'][node]['django_secret_key'] = secret_key
+            node_data['meta']['django_secret_key'] = secret_key
+            operatorData['myNodes'][node_id] = node_data
+            write_operatorData(operatorData)
+        except Exception as e:
             update_output("Failed to create django secret key. Please restart.", output)
             raise RuntimeError("Failed to create django secret key.")
 
-        operatorData = get_operatorData(operatorData)
-        if 'myNodes' in operatorData:
-            for node in operatorData['myNodes']:
-                if 'new_install' in node:
-                    if 'meta' not in operatorData['myNodes'][node]:
-                        operatorData['myNodes'][node]['meta'] = {}
-                    operatorData['myNodes'][node]['django_secret_key'] = secret_key
-        node_data['meta']['django_secret_key'] = secret_key
-        operatorData['myNodes'][node_id] = node_data
-        write_operatorData(operatorData)
     return operatorData
         
 def setup_pyenv(output=None, node_data=None):

@@ -842,8 +842,9 @@ class FieldRow(BoxLayout):
         with self.canvas.after:
             Color(1, 1, 1, 1) 
             self.border_line = Line(rectangle=(self.x, self.y, self.width, self.height), width=0.5)
-
-        self.title_label = Label(text=text, size_hint_x=None, width=dp(150)* w_scale, text_size=(dp(150)* t_scale, None))
+        # print('w_scale',w_scale, type(w_scale))
+        # print('t_scale',t_scale, type(t_scale))
+        self.title_label = Label(text=text, size_hint_x=None, width=dp(150)* w_scale, font_size=dp(15) * t_scale)
         self.title_label.padding_right = 10
         self.title_label._line = None
         self.title_label.bind(size=self.on_size_title, pos=self.on_size_title)
