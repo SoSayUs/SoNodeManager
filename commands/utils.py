@@ -879,6 +879,8 @@ def declare_self_active(activate, output=None, operatorData=None, wait_for_reloa
         if result == 'Success' and updated:
             operatorData = get_operatorData(operatorData)
             full_nodeData = operatorData['myNodes'][operatorData['local_nodeId']]
+    
+    full_nodeData['nodeData']['hardware_data']['results'] = full_nodeData['meta']['hardware_results']
     print('starting nodeData',full_nodeData)
     if activate == True:
         if 'address' in full_nodeData['settings'] and full_nodeData['settings']['address']:
@@ -4031,7 +4033,7 @@ def run_hardware_test(remote_cmd=None, output=None, node_data=None, operatorData
     results['UPLOAD'] = f"{upload_mbps:.1f} Mbps"
 
     print("results",results)
-    # node_data['meta']['hardware_results'] = results
+    node_data['meta']['hardware_results'] = results
 
     # operatorData['myNodes'][full_nodeData['nodeData']['id']] = full_nodeData
     # print("full_nodeData['meta']['hardware_results']",full_nodeData['meta']['hardware_results'])
