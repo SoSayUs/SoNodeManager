@@ -289,8 +289,8 @@ def setup_llm(output=None, remote_cmd=False, systemPass=None):
     import sys
     import urllib.request
     from pathlib import Path
-
-    def ensure_xcode_clt(sudo_password: str | None = None) -> bool:
+    print('p1')
+    def ensure_xcode_clt(sudo_password=None) -> bool:
         print('-ensure_xcode_clt')
         """
         Check for Xcode Command Line Tools (needed for the C/C++ compiler and
@@ -356,6 +356,7 @@ def setup_llm(output=None, remote_cmd=False, systemPass=None):
                 marker.unlink()
 
         return True
+    print('p1b')
 
     def run_setup(
             venv_dir: str = "~/Sonet/.data/env",
@@ -428,6 +429,7 @@ def setup_llm(output=None, remote_cmd=False, systemPass=None):
             "python_bin": str(venv_python),
             "model_path": str(model_path),
         }
+    print('p1c')
 
     def _download_with_progress(url: str, dest: Path, output=None) -> None:
         def _report(block_num, block_size, total_size):
@@ -441,6 +443,7 @@ def setup_llm(output=None, remote_cmd=False, systemPass=None):
         urllib.request.urlretrieve(url, dest, reporthook=_report)
         print()  # newline after progress
         update_output('Download complete', output, replace=True)
+    print('p1d')
 
     # Uses ~/Sonet/.data/env by default -- pass venv_dir="..." to override.
     paths = run_setup(sudo_password=systemPass, model_url="https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-1M-GGUF/resolve/main/Qwen2.5-7B-Instruct-1M-Q5_K_M.gguf?download=true")
