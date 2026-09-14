@@ -7415,10 +7415,11 @@ class SetupScreen(BoxLayout):
             full_nodeData['settings']['port'] = port
             full_nodeData['settings']['isTesting'] = self.isTesting
             self.operatorData['myNodes'][self.operatorData['selected_node']] = full_nodeData
-            write_operatorData(self.operatorData)
+            
             if self.isTesting:
                 self.enableTasker = False
         full_nodeData['meta']['temp_keys'] = self.temp_keys
+        write_operatorData(self.operatorData)
 
         self.context = {}
         if self.host == 'local':
