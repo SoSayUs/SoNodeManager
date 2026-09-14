@@ -705,12 +705,12 @@ def declare_self_active(activate, output=None, operatorData=None, wait_for_reloa
             print("-operatorData['chainData']['supported_regions']",full_nodeData['meta']['chainData']['supported_regions'])
 
             if full_nodeData['nodeData']['node_level'] == 'super':
-                print('sign with super keys')
+                print('sign with super keys2')
                 # temp_keys = fetch_secure_item('temp_keys')
                 temp_keys = full_nodeData['meta']['temp_keys']
                 signedData = sign(full_nodeData['nodeData'], privKey=temp_keys['privKey'], pubKey=temp_keys['pubKey'], operatorData=operatorData, verify_result=True)
             else:
-                print('sign with node keys')
+                print('sign with node keys2')
                 signedData = sign(full_nodeData['nodeData'], operatorData=operatorData, verify_result=True)
                 
             full_nodeData['nodeData'] = signedData
@@ -951,10 +951,10 @@ def declare_self_active(activate, output=None, operatorData=None, wait_for_reloa
         if full_nodeData['nodeData']['node_level'] == 'super':
             # temp_keys = fetch_secure_item('temp_keys')
             temp_keys = full_nodeData['meta']['temp_keys']
-            # print('sign with super keys', temp_keys)
+            print('sign with super keys1')
             signedData = sign(full_nodeData['nodeData'], privKey=temp_keys['privKey'], pubKey=temp_keys['pubKey'], operatorData=operatorData, verify_result=True, remove_skip_fields=True)
         else:
-            print('sign with node keys')
+            print('sign with node keys1')
             signedData = sign(full_nodeData['nodeData'], operatorData=operatorData, verify_result=True, remove_skip_fields=True)
         if is_running or activate == False:
             for iden, ip in nodes.items():
@@ -1105,12 +1105,12 @@ def declare_self_active(activate, output=None, operatorData=None, wait_for_reloa
                                 print('node_data',full_nodeData['nodeData'])
 
                                 if full_nodeData['nodeData']['node_level'] == 'super':
-                                    print('sign with super keys')
+                                    print('sign with super keys3')
                                     # temp_keys = fetch_secure_item('temp_keys')
                                     temp_keys = full_nodeData['meta']['temp_keys']
                                     signedData = sign(full_nodeData['nodeData'], privKey=temp_keys['privKey'], pubKey=temp_keys['pubKey'], operatorData=operatorData, verify_result=True, remove_skip_fields=True)
                                 else:
-                                    print('sign with node keys')
+                                    print('sign with node keys3')
                                     signedData = sign(full_nodeData['nodeData'], operatorData=operatorData, verify_result=True, remove_skip_fields=True)
                                     
                                 full_nodeData['nodeData'] = signedData
