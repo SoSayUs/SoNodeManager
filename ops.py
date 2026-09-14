@@ -5017,6 +5017,7 @@ class SetupScreen(BoxLayout):
         self.parentRegionId = parentRegionId
         self.obj_type = obj_type
         self.obj_id = obj_id
+        self.temp_keys = None
         self.following_cmd = following_cmd
         self.install_ops = ['install', 'new_node_remote', 'new_node_local']
 
@@ -5044,6 +5045,7 @@ class SetupScreen(BoxLayout):
             self.parent_screen.display_layout.remove_widget(self.field)
         except:
             pass
+
         if self.option and self.option != 'new_network':
             if self.option.lower() == 'new_node_local':
                 self.host = 'local'
@@ -5111,7 +5113,7 @@ class SetupScreen(BoxLayout):
                         '''Other devices will see the IP address of this node if you are not running a VPN''',
                         '''Only use quick install if you have previously used quick uninstall''',
                         '''After setup is complete and you activate this node a connection will be established with peer nodes and relevant data up to this point will be downloaded. This node will then be open to serving data and receiving rewards.''',
-                        '''The install could take 20+ minutes and may appear to freeze at times. Give it a chance to finish before restarting.'''
+                        '''The install could take 20+ minutes.'''
                     ]
                     if 'debug' in self.operatorData and self.operatorData['debug']:
                         texts.append('''\n*Notice*\nYou have debug activated, requirements will not be installed while in this state.\nTurn off debug in settings or continue.''')
@@ -5232,6 +5234,15 @@ class SetupScreen(BoxLayout):
                     self.continue_button = Button(text='Install', size_hint=(1, None), height=dp(30)* w_scale, font_size=dp(15) * t_scale)
                     self.continue_button.bind(on_press=self.run_install)
                     self.add_widget(self.continue_button)
+
+                    remove = []
+                    for n in self.operatorData['myNodes']:
+                        if 'new_install' in n:
+                            remove.append(n)
+                    if remove:
+                        for n in remove:
+                            del self.operatorData['myNodes'][n]
+                        write_operatorData(self.operatorData)
 
             elif self.option.lower() == 'deactivate':
                 self.scroll_view = ScrollView(size_hint=(1, 1), do_scroll_x=False, do_scroll_y=True, scroll_type=['bars', 'content'],bar_width=17, bar_color=(1, 1, 1, 1), bar_inactive_color=(1, 1, 1, .3))
@@ -7103,11 +7114,21 @@ class SetupScreen(BoxLayout):
                 response = '\nNode status synced and deactivated\n' 
             Clock.schedule_once(lambda dt, line=response: self.update_text(line))
             self.refresh_sidebar(self)
+            try:
+                del operatorData['myNodes'][operatorData['selected_node']]['meta']['temp_keys']
+                write_operatorData(operatorData)
+            except:
+                pass
         elif self.option.lower() == 'activate':
             if self.host == 'remote':
                 fetch_remote_data(self.remote_data, operatorData=None, fetch_key=True, ssh_client=self.ssh_client, output=None)
                 self.ssh_client.close()
-            store_secure_item("temp_keys", None)
+            # store_secure_item("temp_keys", None)
+            try:
+                del operatorData['myNodes'][operatorData['selected_node']]['meta']['temp_keys']
+                write_operatorData(operatorData)
+            except:
+                pass
         elif self.option.lower() == 'update':
             operatorData = get_operatorData()
             operatorData['last_server_update'] = dt_to_string(now_utc())
@@ -7267,8 +7288,9 @@ class SetupScreen(BoxLayout):
             user_id = self.operatorData['user_id']
             super_keyPair = createKeyPair(user_id, self.passphrase, 'guardian', key_strength='ML_DSA_87')
             from commands.utils import hash_upk_id
-            print('HHEEEERRRREE',{'pubKey':super_keyPair[1],'privKey':super_keyPair[0],'keyId':hash_upk_id(super_keyPair[1])})
-            store_secure_item("temp_keys", {'pubKey':super_keyPair[1],'privKey':super_keyPair[0],'keyId':hash_upk_id(super_keyPair[1])})
+            # print('HHEEEERRRREE',{'pubKey':super_keyPair[1],'privKey':super_keyPair[0],'keyId':hash_upk_id(super_keyPair[1])})
+            # store_secure_item("temp_keys", {'pubKey':super_keyPair[1],'privKey':super_keyPair[0],'keyId':hash_upk_id(super_keyPair[1])})
+            self.temp_keys = {'pubKey':super_keyPair[1],'privKey':super_keyPair[0],'keyId':hash_upk_id(super_keyPair[1])}
             if next_cmd:
                 next_cmd()
 
@@ -7396,6 +7418,7 @@ class SetupScreen(BoxLayout):
             write_operatorData(self.operatorData)
             if self.isTesting:
                 self.enableTasker = False
+        full_nodeData['meta']['temp_keys'] = self.temp_keys
 
         self.context = {}
         if self.host == 'local':
@@ -8258,7 +8281,7 @@ class CommandRunner:
                             ): self.update_output(line)
                         )
                         self.operator_screen.job_running = False
-                        Clock.schedule_once(lambda dt, line=f'Updater halted due to remote command failure': self.update_output(line))
+                        Clock.schedule_once(lambda dt, line=f'\n\nUpdater halted due to remote command failure': self.update_output(line))
                         raise RuntimeError("Updater halted due to remote command failure")
                 else:
                     with self.lock:
@@ -8510,6 +8533,8 @@ class CommandRunner:
                         lambda dt, l=f"{time_str} {cleaned}": self.update_output(l)
                     )
                     if 'raise' in output or 'RuntimeError' in output:
+                        self.operator_screen.job_running = False
+                        Clock.schedule_once(lambda dt, line=f'\n\nUpdater halted due to remote command failure': self.update_output(line))
                         raise RuntimeError("Updater halted due to remote command failure")
 
             if channel.recv_stderr_ready():

@@ -703,7 +703,8 @@ def declare_self_active(activate, output=None, operatorData=None, wait_for_reloa
 
             if full_nodeData['nodeData']['node_level'] == 'super':
                 print('sign with super keys')
-                temp_keys = fetch_secure_item('temp_keys')
+                # temp_keys = fetch_secure_item('temp_keys')
+                temp_keys = full_nodeData['meta']['temp_keys']
                 signedData = sign(full_nodeData['nodeData'], privKey=temp_keys['privKey'], pubKey=temp_keys['pubKey'], operatorData=operatorData, verify_result=True)
             else:
                 print('sign with node keys')
@@ -941,8 +942,9 @@ def declare_self_active(activate, output=None, operatorData=None, wait_for_reloa
 
         broadcast_json = None
         if full_nodeData['nodeData']['node_level'] == 'super':
-            temp_keys = fetch_secure_item('temp_keys')
-            print('sign with super keys', temp_keys)
+            # temp_keys = fetch_secure_item('temp_keys')
+            temp_keys = full_nodeData['meta']['temp_keys']
+            # print('sign with super keys', temp_keys)
             signedData = sign(full_nodeData['nodeData'], privKey=temp_keys['privKey'], pubKey=temp_keys['pubKey'], operatorData=operatorData, verify_result=True, remove_skip_fields=True)
         else:
             print('sign with node keys')
@@ -1097,13 +1099,18 @@ def declare_self_active(activate, output=None, operatorData=None, wait_for_reloa
 
                                 if full_nodeData['nodeData']['node_level'] == 'super':
                                     print('sign with super keys')
-                                    temp_keys = fetch_secure_item('temp_keys')
+                                    # temp_keys = fetch_secure_item('temp_keys')
+                                    temp_keys = full_nodeData['meta']['temp_keys']
                                     signedData = sign(full_nodeData['nodeData'], privKey=temp_keys['privKey'], pubKey=temp_keys['pubKey'], operatorData=operatorData, verify_result=True, remove_skip_fields=True)
                                 else:
                                     print('sign with node keys')
                                     signedData = sign(full_nodeData['nodeData'], operatorData=operatorData, verify_result=True, remove_skip_fields=True)
                                     
                                 full_nodeData['nodeData'] = signedData
+                                try:
+                                    del operatorData['myNodes'][full_nodeData['nodeData']['id']]['meta']['temp_keys']
+                                except:
+                                    pass
                                 if not broadcast_to_network:
                                     syncSuccess = True
                                     update_output(f'\nComplete.\n', output)
@@ -1178,12 +1185,17 @@ def declare_self_active(activate, output=None, operatorData=None, wait_for_reloa
                                 update_output(f'node activation fail: {str(e)}\n', output)
                 except Exception as e:
                     print('node declare fail',str(e))
+    
     if proceed and not syncSuccess and output:
         return 'failed_network_contact'
     
     elif not is_running and output:
         update_output(f'External access not achieved.\nShould be accessable at {node_ip_address}.\nConsider opening the port on your router.\n', output)
     
+    try:
+        del operatorData['myNodes'][full_nodeData['nodeData']['id']]['meta']['temp_keys']
+    except:
+        pass
     operatorData['syncingDB'] = False
     write_operatorData(operatorData)   
     if syncSuccess:

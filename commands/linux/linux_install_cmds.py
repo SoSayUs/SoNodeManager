@@ -1031,7 +1031,7 @@ special_commands = [
 
 action_cmds = [
     ['run_command', 'get_variables'],
-    # ['run_command', 'hardware_check'],
+    ['run_command', 'hardware_check'],
     ['run_command', 'pull_git'],
     ['run_command', 'adjust_firewall'],
     ["chmod", "755", homepath + "/Sonet/SoNodeServer"],

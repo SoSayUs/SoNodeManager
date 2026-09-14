@@ -311,7 +311,7 @@ action_cmds = [
     ["echo", "activating"],
     ['run_command', 'get_variables'],
     ['run_command', 'update_repo'],
-    # ['run_command', 'hardware_check'],
+    ['run_command', 'hardware_check'],
     ['run_command', 'activate_cloudflare_service'],
     ['run_command', 'run_adjust_settings'],
     ['run_command', 'run_config_nginx'],
