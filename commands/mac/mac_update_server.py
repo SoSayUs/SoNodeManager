@@ -116,7 +116,7 @@ special_commands = [
     {'cmd':'restart_cloudflare_service', 'reqs':'output_display'},
     {'cmd':'special_job', 'reqs':'output_display'},
     {'cmd':'run_update_repo', 'reqs':'output_display'},
-    {'cmd':'run_config_nginx', 'reqs':'output_display'},
+    # {'cmd':'run_config_nginx', 'reqs':'output_display'},
     {'cmd':'run_setup_gunicorn', 'reqs':'output_display'},
 ]
 
@@ -130,7 +130,7 @@ action_cmds = [
     ['run_command', 'run_adjust_settings'],
     ['run_command', 'restart_cloudflare_service'],
     ["sudo", "-S", f"{homepath}/Sonet/.data/env/bin/python3", f"{homepath}/Sonet/SoNodeServer/manage.py", "migrate"],
-    ['run_command', 'run_config_nginx'],
+    # ['run_command', 'run_config_nginx'],
     # ['sudo', '-S', 'nginx', '-t'],
     ['sudo', '-S', '/opt/homebrew/bin/nginx', '-t'],
     ['run_command', 'run_setup_gunicorn'],
