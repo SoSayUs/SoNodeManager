@@ -117,7 +117,7 @@ special_commands = [
     {'cmd':'special_job', 'reqs':'output_display'},
     {'cmd':'run_update_repo', 'reqs':'output_display'},
     # {'cmd':'run_config_nginx', 'reqs':'output_display'},
-    {'cmd':'run_setup_gunicorn', 'reqs':'output_display'},
+    # {'cmd':'run_setup_gunicorn', 'reqs':'output_display'},
 ]
 
 
@@ -133,7 +133,7 @@ action_cmds = [
     # ['run_command', 'run_config_nginx'],
     # ['sudo', '-S', 'nginx', '-t'],
     ['sudo', '-S', '/opt/homebrew/bin/nginx', '-t'],
-    ['run_command', 'run_setup_gunicorn'],
+    # ['run_command', 'run_setup_gunicorn'],
     # ['run_command', 'run_config_supervisor'],
     ['sudo', '-S', 'pkill', '-f', 'supervisord'],
     ['sudo', '-S', 'pkill', '-f', 'rqworker'],
