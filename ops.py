@@ -4173,7 +4173,7 @@ class NodesScreen(BoxLayout):
         self.starting_node = self.operatorData['selected_node']
         for node_id, data in self.operatorData['myNodes'].items():
             print('node_id',node_id)
-            if not value_is_none(data['nodeData']['activated_dt']):
+            if data.get('nodeData') and data['nodeData'].get('activated_dt') and not value_is_none(data['nodeData']['activated_dt']):
                 self.completed_nodes.append(node_id)
                 self.select_node(node_id=node_id, fetch_remote=False)
                 # send_manager_to_remote(node_id)
@@ -4193,7 +4193,7 @@ class NodesScreen(BoxLayout):
         print('-self.update_node')
         for node_id, data in self.operatorData['myNodes'].items():
             print('node_id',node_id, data['meta'].get('os', None),"self.completed_nodes",self.completed_nodes)
-            if not value_is_none(data['nodeData']['activated_dt']):
+            if data.get('nodeData') and data['nodeData'].get('activated_dt') and not value_is_none(data['nodeData']['activated_dt']):
                 if data['meta'].get('os', None) and data['meta'].get('os') == 'Linux':
                     if node_id not in self.completed_nodes and 'nodeData' in data and 'id' in data['nodeData']:
                         self.completed_nodes.append(node_id)
