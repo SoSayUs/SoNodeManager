@@ -2330,23 +2330,35 @@ def get_commands(task, system=None, operatorData=None, in_full=False, extras={})
             brew_path = find_brew()
             uid = os.getuid()
             cmds = [
-                
-                ["raise_if_error", f"{homepath}/Sonet/.data/env/bin/python3", f"{homepath}/Sonet/SoNodeServer/manage.py", "check"],
+                ["raise_if_error", "sudo", "-S", f"{homepath}/Sonet/.data/env/bin/python3", f"{homepath}/Sonet/SoNodeServer/manage.py", "check"],
                 ["raise_if_error", "sudo", "-S", f"{homepath}/Sonet/.data/env/bin/python3", f"{homepath}/Sonet/SoNodeServer/manage.py", "collectstatic", "--noinput"],
+
+                ['sudo', '-S', 'pkill', '-f', 'supervisord'],
+                ['sudo', '-S', 'pkill', '-f', 'rqworker'],
+                ['sudo', '-S', 'pkill', '-f', 'gunicorn'],
+                ['/bin/sleep', '2'],  # give them time to die
+                ['sudo', '-S', 'rm', '-f', f'/Users/{username}/Sonet/.data/supervisor/supervisor.sock'],
                 ['sudo', '-S', 'chown', '-R', f'{username}:staff', f'/Users/{username}/Sonet/.data/logs'],
                 ['sudo', '-S', 'chown', '-R', f'{username}:staff', f'/Users/{username}/Sonet/.data/supervisor'],
-                ['/opt/homebrew/bin/supervisord', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf'],
-                ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'reread'],
-                ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'update'],
+                # ['/opt/homebrew/bin/supervisord', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf'],
+                ['bash', '-c', f'setsid /opt/homebrew/bin/supervisord -c /Users/{username}/Sonet/.data/supervisor/supervisord.conf < /dev/null > /dev/null 2>&1 &'],
+                # ['bash', '-c', f'for i in $(seq 1 30); do [ -S /Users/{username}/Sonet/.data/supervisor/supervisor.sock ] && exit 0; sleep 0.5; done; exit 1'],
+                # ['bash', '-c', f'for i in $(seq 1 30); do sudo -S /opt/homebrew/bin/supervisorctl -c /Users/{username}/Sonet/.data/supervisor/supervisord.conf status >/dev/null 2>&1 && exit 0; sleep 0.5; done; exit 1'],
+                # ['bash', '-c', f'for i in $(seq 1 30); do /opt/homebrew/bin/supervisorctl -c /Users/{username}/Sonet/.data/supervisor/supervisord.conf status >/dev/null 2>&1 && exit 0; sleep 0.5; done; exit 1'],
+                # ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'reread'],
+                # ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'update'],
+                # ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'start', 'gunicorn'],
+                # ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'start', 'rqscheduler'],
+                # ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'start', 'tor'],
+                ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'start', 'all'],
                 ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'restart', 'all'],
-
+                ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'status'],
                 ['launchctl', 'bootout', f'gui/{uid}', f'/Users/{username}/Library/LaunchAgents/com.sonet.supervisor.plist'],
                 ['sudo', '-S', 'pkill', '-f', 'supervisord'],
                 ['/bin/rm', '-f', f'/Users/{username}/Sonet/.data/supervisor/supervisor.sock'],
                 ['/bin/rm', '-f', f'/Users/{username}/Sonet/.data/supervisor/supervisord.pid'],
                 ['/bin/sleep', '2'],
                 ['launchctl', 'bootstrap', f'gui/{uid}', f'/Users/{username}/Library/LaunchAgents/com.sonet.supervisor.plist'],
-
             ]
             return cmds, {}
 
