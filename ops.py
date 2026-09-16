@@ -3716,6 +3716,7 @@ class NodesScreen(BoxLayout):
                     if 'node_id' not in data:
                         commands.append({'title':"Install",'action':partial(self.remote_install, nickname)})
                     commands.append({'title':"Update",'action':partial(self.remote_update, nickname)})
+                    commands.append({'title':"Fetch",'action':partial(self.remote_fetch, nickname)})
                     if nickname.lower() != 'local':
                         commands.append({'title':"Delete",'action':partial(self.delete_remote, nickname)})
                     self.content.add_widget(FieldRow(nickname, commands, is_button_list=True))
@@ -3965,11 +3966,11 @@ class NodesScreen(BoxLayout):
             else:
                 text = f'Failed to contact remote machine.'
                 Clock.schedule_once(lambda dt, line=text: update_text(self, line))
-                Clock.schedule_once(lambda dt: self.add_button(text='Create', action=partial(self.create_ssh)))
+                # Clock.schedule_once(lambda dt: self.add_button(text='Create', action=partial(self.create_ssh)))
                 return 'Connection failed'
         text = f'Missing connection data.'
         Clock.schedule_once(lambda dt, line=text: update_text(self, line))
-        Clock.schedule_once(lambda dt: self.add_button(text='Create', action=partial(self.create_ssh)))
+        # Clock.schedule_once(lambda dt: self.add_button(text='Create', action=partial(self.create_ssh)))
         return 'Missing host data'
 
     def send_self_ssh(self, username, host, remote_path): # not used
@@ -4027,6 +4028,14 @@ class NodesScreen(BoxLayout):
         for nickname, data in self.operatorData['myRemotes'].items():
             if nickname == node_id:
                 send_manager_to_remote(data['node_id'])
+                break
+
+    def remote_fetch(self, node_id=''):
+        print('-remote_fetch',node_id)
+        for nickname, data in self.operatorData['myRemotes'].items():
+            if nickname == node_id:
+                # send_manager_to_remote(data['node_id'])
+                fetch_remote_data(data, operatorData=None, fetch_key=False, ssh_client=None, output=None)
                 break
 
     def view_node_data(self, node_name=''):
@@ -4170,7 +4179,7 @@ class NodesScreen(BoxLayout):
     def run_node_sequence_step2(self):
         print('-run_node_sequence_step2')
         self.completed_nodes = []
-        self.starting_node = self.operatorData['selected_node']
+        self.starting_node = self.operatorData.get('selected_node', None)
         for node_id, data in self.operatorData['myNodes'].items():
             print('node_id',node_id)
             if data.get('nodeData') and data['nodeData'].get('activated_dt') and not value_is_none(data['nodeData']['activated_dt']):
@@ -4194,17 +4203,18 @@ class NodesScreen(BoxLayout):
         for node_id, data in self.operatorData['myNodes'].items():
             print('node_id',node_id, data['meta'].get('os', None),"self.completed_nodes",self.completed_nodes)
             if data.get('nodeData') and data['nodeData'].get('activated_dt') and not value_is_none(data['nodeData']['activated_dt']):
-                if data['meta'].get('os', None) and data['meta'].get('os') == 'Linux':
-                    if node_id not in self.completed_nodes and 'nodeData' in data and 'id' in data['nodeData']:
-                        self.completed_nodes.append(node_id)
-                        self.select_node(node_id=node_id, fetch_remote=False)
+                # if data['meta'].get('os', None) and data['meta'].get('os') == 'Linux':
+                if node_id not in self.completed_nodes and 'nodeData' in data and 'id' in data['nodeData']:
+                    self.completed_nodes.append(node_id)
+                    self.select_node(node_id=node_id, fetch_remote=False)
 
-                        if self.cmd == 'update':
-                            Clock.schedule_once(lambda dt, line=self: self.parent_screen.display_layout.run_update(new_text_screen=False, operatorData=self.operatorData))
-                        elif self.cmd == 'restart':
-                            Clock.schedule_once(lambda dt, line=self: self.parent_screen.display_layout.run_restart(new_text_screen=False, operatorData=self.operatorData))
-                        return
-        self.select_node(node_id=self.starting_node, fetch_remote=False)
+                    if self.cmd == 'update':
+                        Clock.schedule_once(lambda dt, line=self: self.parent_screen.display_layout.run_update(new_text_screen=False, operatorData=self.operatorData))
+                    elif self.cmd == 'restart':
+                        Clock.schedule_once(lambda dt, line=self: self.parent_screen.display_layout.run_restart(new_text_screen=False, operatorData=self.operatorData))
+                    return
+        if self.starting_node:
+            self.select_node(node_id=self.starting_node, fetch_remote=False)
         self.parent_screen.node_screen = None
         try:
             self.parent_screen.display_layout.text_input.text += f'\n\nAll node updates complete ({len(self.completed_nodes)})\n\n'
@@ -5349,9 +5359,10 @@ class SetupScreen(BoxLayout):
                             self.broadcast_layout.add_widget(self.broadcast_input)
                             self.add_widget(self.broadcast_layout)
 
-                        node_types = ('Auto', 'Relay')
+                        node_types = ('Auto', 'Server', 'Maintainer', 'Relay')
                         if verify_super_status(self.operatorData):
-                            node_types = ('Server','Maintainer','Auto','Intelligence','Relay')
+                            # if data['meta'].get('os', None) and data['meta'].get('os') == 'MacOS':
+                            node_types = ('Auto','Server','Maintainer','Intelligence','Relay')
                         try:
                             selected_node_type = 'Auto'
                             for n in node_types:
@@ -8169,6 +8180,7 @@ class CommandRunner:
         now = datetime.datetime.now() - self.start_time
         cmd_text = '\n\n(%s/%s)- ' %(self.command_index, self.total_steps)
         try:
+            self.check_exit_status = False
             print('-command:', command, cmd_text.replace('\n',''))
             if isinstance(command, list):
                 for c in command:
@@ -8254,8 +8266,10 @@ class CommandRunner:
                     else:
                         print('no reqs')
                         func()
+            
             elif command[0] == 'raise_if_error':
                 command.pop(0)
+                self.check_exit_status = True
                 if self.remote_data:
                     if isinstance(command, list):
                         cmd_str = ' '.join(command)
@@ -8267,54 +8281,24 @@ class CommandRunner:
                         get_pty=True
                     )
 
-                    if cmd_str.strip().startswith("sudo"):
+                    if 'sudo' in command:
                         pw = self.systemPass or self.remote_data["password"]
                         self.stdin.write(pw + "\n")
                         self.stdin.flush()
-
-                    exit_status = self.stdout.channel.recv_exit_status()
-                    if exit_status != 0:
-                        self.end_of_line = True
-                        Clock.schedule_once(
-                            lambda dt, line=(
-                                f"\nRemote command failed (exit {exit_status}):\n"
-                                f"{cmd_str}\n"
-                            ): self.update_output(line)
-                        )
-                        self.operator_screen.job_running = False
-                        Clock.schedule_once(lambda dt, line=f'\n\nUpdater halted due to remote command failure': self.update_output(line))
-                        raise RuntimeError("Updater halted due to remote command failure")
+                    # No recv_exit_status() here — read_output_remote (started below) drains
+                    # output and checks the exit code once the channel actually finishes.
                 else:
                     with self.lock:
                         try:
                             if 'shell' in command or ' | ' in cmd_text:
                                 self.current_process = subprocess.Popen(
-                                    command,
-                                    stdin=subprocess.PIPE,
-                                    stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE,
-                                    text=True,
-                                    shell=True
+                                    command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE, text=True, shell=True
                                 )
                             else:
-                                # self.master_fd, slave_fd = pty.openpty()
-                                # self.current_process = subprocess.Popen(
-                                #     command,
-                                #     stdin=slave_fd,
-                                #     stdout=slave_fd,
-                                #     stderr=slave_fd,
-                                #     text=True
-                                # )
-                                # os.close(slave_fd)
-
-
                                 self.master_fd, slave_fd = pty.openpty()
                                 self.current_process = subprocess.Popen(
-                                    command,
-                                    stdin=slave_fd,
-                                    stdout=slave_fd,
-                                    stderr=slave_fd,
-                                    text=True
+                                    command, stdin=slave_fd, stdout=slave_fd, stderr=slave_fd, text=True
                                 )
                                 os.close(slave_fd)
 
@@ -8340,8 +8324,9 @@ class CommandRunner:
                             self.end_of_line = True
                             Clock.schedule_once(
                                 lambda dt, line=f'An error occurred: {e}'
-                            : self.update_output(line))
+                                : self.update_output(line))
                             return
+
             else:
                 print('else resp')
                 if 'self.resp' in command:
@@ -8349,17 +8334,20 @@ class CommandRunner:
                     command[index] = self.resp
 
                 if self.remote_data:
+                    import shlex
+
                     if isinstance(command, list):
-                        cmd_str = ' '.join(command)
+                        cmd_str = ' '.join(shlex.quote(part) for part in command)
                     else:
                         cmd_str = command
-                    print('remote cmd:',cmd_str)
+                        
+                    print('remote cmd:', cmd_str)
 
                     if 'input_pass' in cmd_str:
                         cmd_str = cmd_str.replace('input_pass', self.systemPass or self.remote_data["password"])
                     self.stdin, self.stdout, self.stderr = self.ssh_client.exec_command(cmd_str, get_pty=True)
 
-                    if cmd_str.strip().startswith("sudo"):
+                    if 'sudo' in cmd_str:
                         pw = self.systemPass or self.remote_data["password"]
                         self.stdin.write(pw + "\n")
                         self.stdin.flush()
@@ -8378,6 +8366,7 @@ class CommandRunner:
                         except Exception as e:
                             self.end_of_line = True
                             Clock.schedule_once(lambda dt, line=f'An error occurred: {e}': self.update_output(line))
+
             if self.remote_data and self.stdout:
                 threading.Thread(target=self.read_output_remote, daemon=True).start()
             else:
@@ -8492,7 +8481,19 @@ class CommandRunner:
             if channel.recv_ready() or channel.recv_stderr_ready():
                 last_data_time = time.time()
                 
+            # if channel.exit_status_ready() and not channel.recv_ready() and not channel.recv_stderr_ready():
+            #     break
             if channel.exit_status_ready() and not channel.recv_ready() and not channel.recv_stderr_ready():
+                if self.check_exit_status and getattr(self, 'check_exit_status', False):
+                    exit_status = channel.recv_exit_status()
+                    if exit_status != 0:
+                        self.end_of_line = True
+                        Clock.schedule_once(
+                            lambda dt, line=f"\nRemote command failed (exit {exit_status})\n": self.update_output(line)
+                        )
+                        self.operator_screen.job_running = False
+                        Clock.schedule_once(lambda dt, line='\n\nUpdater halted due to remote command failure': self.update_output(line))
+                        raise RuntimeError("Updater halted due to remote command failure")
                 break
             if channel.recv_ready():
                 try:
