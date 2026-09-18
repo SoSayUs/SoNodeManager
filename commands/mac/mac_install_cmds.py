@@ -149,17 +149,51 @@ def update_output(content, output_display=None, replace=False):
         # print('update_output err',str(e))
         pass
 
+def setup_postgres(output=None, remote_cmd=False):
+    def get_pg_version(brew_path):
+        """Get the version of postgresql that brew just installed."""
+        result = subprocess.run([brew_path, 'list', '--versions', 'postgresql'], capture_output=True, text=True)
+        match = re.search(r'(\d+)\.\d+', result.stdout)
+        if match:
+            return match.group(1)
+        raise RuntimeError("Could not detect installed PostgreSQL version")
 
-def get_pg_version(brew_path):
-    """Get the version of postgresql that brew just installed."""
-    result = subprocess.run([brew_path, 'list', '--versions', 'postgresql'], capture_output=True, text=True)
-    match = re.search(r'(\d+)\.\d+', result.stdout)
-    if match:
-        return match.group(1)
-    raise RuntimeError("Could not detect installed PostgreSQL version")
+    pg_version = get_pg_version(brew_path)
+    pg_data_dir = f'/opt/homebrew/var/postgresql@{pg_version}'
 
-pg_version = get_pg_version(brew_path)
-pg_data_dir = f'/opt/homebrew/var/postgresql@{pg_version}'
+    commands1 = [
+        ['sudo', '-S', 'chown', '-R', f'{username}:{group}', pg_data_dir],
+        ['chmod', '700', pg_data_dir]
+    ]
+    # ['run_command', 'link_postgres'],
+    commands2 = [
+        [brew_path, 'services', 'stop', f'postgresql@{pg_version}'],
+        [brew_path, 'services', 'cleanup'],
+        [brew_path, 'services', 'start', f'postgresql@{pg_version}']
+    ]
+
+    get_variables()
+    global systemPass
+    for cmd in commands1:
+        update_output(cmd, output)
+        result = subprocess.run(cmd, input=systemPass, text=True, capture_output=True)
+        if result.returncode != 0:
+        #     content = f"postgres configured successfully:\n{result.stdout}"
+        #     update_output(content, output)
+        # else:
+            content = f"Error configuring postgres:\n{result.stderr}"
+            update_output(content, output)
+    link_postgres(output=output)
+
+    for cmd in commands2:
+        update_output(cmd, output)
+        result = subprocess.run(cmd, input=systemPass, text=True, capture_output=True)
+        if result.returncode != 0:
+        #     content = f"postgres configured successfully:\n{result.stdout}"
+        #     update_output(content, output)
+        # else:
+            content = f"Error configuring gunicorn:\n{result.stderr}"
+            update_output(content, output)
 
 def get_local_ip(remote_cmd=False):
     print('-get_local_ip')
@@ -903,7 +937,7 @@ special_commands = [
     {'cmd':'run_adjust_settings', 'reqs':'output_display'},
     {'cmd':'link_postgres', 'reqs':'output_display'},
     {'cmd':'get_local_ip'},
-    # {'cmd':'setup_rqworker', 'reqs':'output_display'},
+    {'cmd':'setup_postgres', 'reqs':'output_display'},
     {'cmd':'config_supervisor', 'reqs':'output_display'},
     # {'cmd':'edit_worker', 'reqs':'output_display'},
     {'cmd':'write_supervisor_plist', 'reqs':'output_display'},
@@ -937,20 +971,26 @@ action_cmds = [
     ['install_requirements', homepath + "/Sonet/SoNodeServer/requirements.txt", homepath + f"/Sonet/.data/env/bin/pip"],
     ['run_command', 'get_local_ip'],
     [brew_path, 'install', 'postgresql'],
-    ['sudo', '-S', 'chown', '-R', f'{username}:{group}', pg_data_dir],
-    ['chmod', '700', pg_data_dir],
-    ['run_command', 'link_postgres'],
-    [brew_path, 'services', 'stop', f'postgresql@{pg_version}'],
-    [brew_path, 'services', 'cleanup'],
-    [brew_path, 'services', 'start', f'postgresql@{pg_version}'],
+    ['run_command', 'setup_postgres'],
+    # ['sudo', '-S', 'chown', '-R', f'{username}:{group}', pg_data_dir],
+    # ['chmod', '700', pg_data_dir],
+    # ['run_command', 'link_postgres'],
+    # [brew_path, 'services', 'stop', f'postgresql@{pg_version}'],
+    # [brew_path, 'services', 'cleanup'],
+    # [brew_path, 'services', 'start', f'postgresql@{pg_version}'],
     f'''/Users/{username}/Sonet/.data/env/bin/python3 {homepath}/Sonet/SoNodeServer/manage.py shell -c "from django.core.management.utils import get_random_secret_key; print('key:', get_random_secret_key())"''',
     ['/bin/sleep', '2'],
     ['run_command', 'run_fetch_secret_key'],
     ['run_command', 'run_adjust_settings'],
-    f"echo 'input_pass' | sudo -S -u {username} {psql_path} -U {username} -c 'CREATE USER queue WITH PASSWORD \\'K9V43S2P1\\';'",
-    f"echo 'input_pass' | sudo -S -u {username} {psql_path} -U {username} -c 'ALTER USER queue WITH SUPERUSER CREATEDB CREATEROLE;'",
-    f"echo 'input_pass' | sudo -S -u {username} {psql_path} -U {username} -c 'DROP DATABASE IF EXISTS so_data;'",
-    f"echo 'input_pass' | sudo -S -u {username} {psql_path} -U {username} -c 'CREATE DATABASE so_data OWNER queue;'",
+    f'''echo 'input_pass' | sudo -S -u {username} {psql_path} -U {username} -d postgres -c "CREATE USER queue WITH PASSWORD 'K9V43S2P1';"''',
+    f"echo 'input_pass' | sudo -S -u {username} {psql_path} -U {username} -d postgres -c 'ALTER USER queue WITH SUPERUSER CREATEDB CREATEROLE;'",
+    f"echo 'input_pass' | sudo -S -u {username} {psql_path} -U {username} -d postgres -c 'DROP DATABASE IF EXISTS so_data;'",
+    f"echo 'input_pass' | sudo -S -u {username} {psql_path} -U {username} -d postgres -c 'CREATE DATABASE so_data OWNER queue;'",
+
+    # f"echo 'input_pass' | sudo -S -u {username} {psql_path} -U {username} -c 'CREATE USER queue WITH PASSWORD \\'K9V43S2P1\\';'",
+    # f"echo 'input_pass' | sudo -S -u {username} {psql_path} -U {username} -c 'ALTER USER queue WITH SUPERUSER CREATEDB CREATEROLE;'",
+    # f"echo 'input_pass' | sudo -S -u {username} {psql_path} -U {username} -c 'DROP DATABASE IF EXISTS so_data;'",
+    # f"echo 'input_pass' | sudo -S -u {username} {psql_path} -U {username} -c 'CREATE DATABASE so_data OWNER queue;'",
     # ["sudo", "-S", "-u", username, psql_path, "-c", "CREATE USER queue WITH PASSWORD 'K9V43S2P1';"],
     # ["sudo", "-S", "-u", username, psql_path, "-c", "ALTER USER queue WITH SUPERUSER;"],
     # ["sudo", "-S", "-u", username, psql_path, "-c", "DROP DATABASE so_data;"],
@@ -966,6 +1006,8 @@ action_cmds = [
     ['chmod', '644', '~/Sonet/.data/logs/nginx_supervisor.log'],
     ['sudo', '-S', 'chown', '-R', f'{username}:staff', f'/Users/{username}/Sonet/.data/logs'],
     ['sudo', '-S', 'chown', '-R', f'{username}:staff', f'/Users/{username}/Sonet/.data/supervisor'],
+    [brew_path, 'install', 'redis'],
+    [brew_path, 'services', 'start', 'redis'],
     ['run_command', 'setup_gunicorn'],
     [brew_path, 'install', 'supervisor', 'nginx'],
     [brew_path, 'services', 'stop', 'supervisor'],
@@ -996,8 +1038,10 @@ action_cmds = [
     ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'update'],
     ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'start', 'gunicorn'],
     ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'restart', 'all'],
+    ['sudo', '-S', 'rm', '-f', f'/Users/{username}/Sonet/.data/supervisor/nginx.pid'],
     ['sudo', '-S', 'rm', '-f', '/opt/homebrew/var/run/nginx.pid'],
-    ['sudo', '-S', '/opt/homebrew/bin/nginx', '-t'],
+    ['/opt/homebrew/bin/nginx', '-t'],
+    # ['sudo', '-S', '/opt/homebrew/bin/nginx', '-t'],
     [brew_path, 'services', 'restart', 'nginx'],
     ['run_command', 'write_supervisor_plist'],
     ['launchctl', 'bootout', f'gui/{uid}', f'/Users/{username}/Library/LaunchAgents/com.sonet.supervisor.plist'],
