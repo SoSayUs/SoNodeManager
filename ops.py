@@ -4389,7 +4389,12 @@ class SettingsScreen(BoxLayout):
                     if 'debug' not in self.selected_node['meta']:
                         self.content.add_widget(FieldRow('debug', False, editable=True, superuser=False))
 
-                    commands = [{'title':"SyncDB",'action':partial(self.parent_screen.switch_layout, 'syncdb')}, {'title':"Force Deactivate",'action':partial(self.parent_screen.switch_layout, 'deactivate')}, {'title':"Force Activate",'action':partial(self.parent_screen.switch_layout, 'activate')}]
+                    commands = [
+                        {'title':"SyncDB",'action':partial(self.parent_screen.switch_layout, 'syncdb')},
+                        {'title':"Force Deactivate",'action':partial(self.parent_screen.switch_layout, 'deactivate')},
+                        {'title':"Force Activate",'action':partial(self.parent_screen.switch_layout, 'activate')},
+                        {'title':"Reinstall",'action':partial(self.parent_screen.switch_layout, 'install')}
+                        ]
                     
                     if 'userData' in operatorData and 'id' in operatorData['userData'] and 'user_is_super' in operatorData and operatorData['user_is_super'] == True:
                         commands.append({'title':"Super",'action':partial(self.parent_screen.switch_layout, 'super_actions')})
