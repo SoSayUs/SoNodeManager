@@ -1055,6 +1055,7 @@ action_cmds = [
     ['launchctl', 'bootstrap', f'gui/{uid}', f'/Users/{username}/Library/LaunchAgents/com.sonet.supervisor.plist'],
     [brew_path, 'autoremove'],
     [brew_path, 'cleanup'],
+    ['/bin/sleep', '3'],
     ['run_command', 'finalize'],
     # ['echo', 'thats it!'],
 ]
