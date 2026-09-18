@@ -5251,13 +5251,16 @@ class SetupScreen(BoxLayout):
                     self.add_widget(self.continue_button)
 
                     remove = []
-                    for n in self.operatorData['myNodes']:
-                        if 'new_install' in n:
-                            remove.append(n)
-                    if remove:
-                        for n in remove:
-                            del self.operatorData['myNodes'][n]
-                        write_operatorData(self.operatorData)
+                    try:
+                        for n in self.operatorData['myNodes']:
+                            if 'new_install' in n:
+                                remove.append(n)
+                        if remove:
+                            for n in remove:
+                                del self.operatorData['myNodes'][n]
+                            write_operatorData(self.operatorData)
+                    except:
+                        pass
 
             elif self.option.lower() == 'deactivate':
                 self.scroll_view = ScrollView(size_hint=(1, 1), do_scroll_x=False, do_scroll_y=True, scroll_type=['bars', 'content'],bar_width=17, bar_color=(1, 1, 1, 1), bar_inactive_color=(1, 1, 1, .3))
