@@ -1045,7 +1045,7 @@ action_cmds = [
     ['/bin/sleep', '1'],
     ['/opt/homebrew/bin/nginx', '-t'],
     # ['sudo', '-S', '/opt/homebrew/bin/nginx', '-t'],
-    [brew_path, 'services', 'restart', 'nginx'],
+    # [brew_path, 'services', 'restart', 'nginx'],
     ['run_command', 'write_supervisor_plist'],
     ['launchctl', 'bootout', f'gui/{uid}', f'/Users/{username}/Library/LaunchAgents/com.sonet.supervisor.plist'],
     ['sudo', '-S', 'pkill', '-f', 'supervisord'],
