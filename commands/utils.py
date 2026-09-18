@@ -4054,7 +4054,7 @@ def run_hardware_test(remote_cmd=None, output=None, node_data=None, operatorData
 
     # operatorData['myNodes'][full_nodeData['nodeData']['id']] = full_nodeData
     # print("full_nodeData['meta']['hardware_results']",full_nodeData['meta']['hardware_results'])
-    node_data['nodeData']['hardware_data']['results'] = results
+    # node_data['nodeData']['hardware_data']['results'] = results
 
     if not dl_passed:
         passed = False
