@@ -1642,7 +1642,10 @@ class MonitorScreen(BoxLayout):
 
                 status_indicator = system_info.get("status")
                 if status_indicator is not None:
-                    if status_indicator:
+                    if status_indicator and status_indicator == 'inactive':
+                        container.status_indicator.label.text = f"Status: Inactive"
+                        container.status_indicator.label.color = (1, 0.7, 0.2, 1)
+                    elif status_indicator:
                         container.status_indicator.label.text = f"Status: OK"
                         container.status_indicator.label.color = (0.4, 1, 0.4)
                     else:
@@ -2598,8 +2601,10 @@ class MonitorScreen(BoxLayout):
                 raw = stdout.read().decode().strip()
                 running_jobs = json.loads(raw)
                 # print("Running jobs:", running_jobs)
-                system_info['queue'] = running_jobs
                 system_info['status'] = True
+                system_info['queue'] = running_jobs
+                if 'isActive' in running_jobs and not running_jobs['isActive']:
+                    system_info['status'] = 'inactive'
             except Exception as e:
                 print('sys info workers err 2',str(e))
                 workers = {
