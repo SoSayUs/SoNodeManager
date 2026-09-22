@@ -510,7 +510,7 @@ def update_node_data(operatorData=None):
         else:
             iden = 'self'
         try:
-            r = connect_to_node(ip, f'network/get_node_request/{iden}', operatorData=operatorData)
+            r = connect_to_node(ip, f'network/get_node_request/{iden}', operatorData=operatorData, timeout=(25,30))
             if r and r.status_code == 200:
                 json_response = r.json()
                 print('json_response',json_response)
@@ -578,7 +578,10 @@ def get_node_list(operatorData=None, target='master', self_node={}, exclude_self
         elif target == 'master' and 'ip_master_list' in operatorData:
             print('master')
             nodes = operatorData['ip_master_list']
-            if exclude_relays and 'node_list' in operatorData and 'node_data' in operatorData['node_list'][[target]]:
+            # print('nodes',type(nodes), nodes)
+            # print("operatorData['node_list']",type(operatorData['node_list']),operatorData['node_list'])
+            # print('target',target)
+            if exclude_relays and 'node_list' in operatorData and 'node_data' in operatorData['node_list'][target]:
                 if isinstance(nodes, list):
                     nodes = {n['address'][:n['address'].find('.')]:n for n in nodes if n['address'][:n['address'].find('.')] not in operatorData['node_list']['master']['node_data']['relay']}
                 else:
