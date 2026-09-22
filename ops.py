@@ -1643,7 +1643,7 @@ class MonitorScreen(BoxLayout):
                 status_indicator = system_info.get("status")
                 if status_indicator is not None:
                     if status_indicator and status_indicator == 'inactive':
-                        container.status_indicator.label.text = f"Status: Inactive"
+                        container.status_indicator.label.text = f"Status: Waiting"
                         container.status_indicator.label.color = (1, 0.7, 0.2, 1)
                     elif status_indicator:
                         container.status_indicator.label.text = f"Status: OK"
