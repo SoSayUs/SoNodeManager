@@ -136,6 +136,7 @@ action_cmds = [
     ["raise_if_error", "sudo", "-S", f"{homepath}/Sonet/.data/env/bin/python3", f"{homepath}/Sonet/SoNodeServer/manage.py", "collectstatic", "--noinput"],
     ['run_command', 'restart_cloudflare_service'],
     ["sudo", "-S", "supervisorctl", "status"],
+    ["pkill", "-9", "-f", "'rqworker'"],
     ["sudo", "-S", "supervisorctl", "reread"],
     ["sudo", "-S", "supervisorctl", "update"],
     ["sudo", "-S", "supervisorctl", "reload"],
