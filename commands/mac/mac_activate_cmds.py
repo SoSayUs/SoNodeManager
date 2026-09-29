@@ -418,7 +418,7 @@ def setup_llm(output=None, remote_cmd=False, systemPass=None):
 
         # 3. Download the model if not already present
         model_filename = model_url.split("/")[-1]
-        model_filename = model_filename.split("?")[-1]
+        model_filename = model_filename.split("?")[0]
         model_path = model_path_dir / model_filename
 
         if not model_path.exists():
@@ -463,7 +463,8 @@ def setup_llm(output=None, remote_cmd=False, systemPass=None):
 
 def add_llama_to_supervisor(
     sudo_password=None,
-    model_filename="Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
+    # model_filename="Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
+    model_url=None,
     port=8081,
     n_ctx=9000,
     strict_determinism=False,
@@ -471,7 +472,8 @@ def add_llama_to_supervisor(
     home = Path(f"/Users/{username}")
     conf = home / "Sonet/.data/supervisor/supervisord.conf"
     env_bin = home / "Sonet/.data/env/bin"
-    model_filename = model_filename.split("?")[-1]
+    model_filename = model_url.split("/")[-1]
+    model_filename = model_filename.split("?")[0]
     model = home / "Sonet/.data/models" / model_filename
 
     cmd = (
