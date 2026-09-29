@@ -1073,7 +1073,7 @@ action_cmds = [
     ["run_command", "write_gunicorn_service"],
     ["run_command", "gunicorn_logrotate"],
     ["raise_if_error", "sudo", "-S", f"{homepath}/Sonet/.data/env/bin/python3", f"{homepath}/Sonet/SoNodeServer/manage.py", "check"],
-    ["pkill", "-9", "-f", "'rqworker'"],
+    ["pkill", "-9", "-f", "rqworker"],
     ["sudo", "-S", "systemctl", "daemon-reexec"],
     ["sudo", "-S", "systemctl", "daemon-reload"],
     ["sudo", "-S", "systemctl", "stop", "gunicorn.socket"],
