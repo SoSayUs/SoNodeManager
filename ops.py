@@ -7129,6 +7129,15 @@ class SetupScreen(BoxLayout):
         elif self.option.lower() == 'deactivate':
             if self.host == 'remote':
                 fetch_remote_data(self.remote_data, operatorData=None, fetch_key=True, ssh_client=self.ssh_client, output=None)
+                try:
+
+                    # this needs to remove temp_keys locally and remotely here and under activate
+                    del operatorData['myNodes'][operatorData['selected_node']]['meta']['temp_keys']
+                    write_operatorData(operatorData)
+                    from commands.utils import update_remote_data
+                    update_remote_data(updated_node_data=self.remote_data, remote_opData=None, remote_data=None, operatorData=operatorData, remote_password=None, ssh_client=self.ssh_client, output=None)
+                except:
+                    pass
                 self.ssh_client.close()
             from commands.utils import get_or_create_node_obj
             full_nodeData, is_new = get_or_create_node_obj()
@@ -7145,14 +7154,19 @@ class SetupScreen(BoxLayout):
                 pass
         elif self.option.lower() == 'activate':
             if self.host == 'remote':
-                fetch_remote_data(self.remote_data, operatorData=None, fetch_key=True, ssh_client=self.ssh_client, output=None)
+                self.remote_data = fetch_remote_data(self.remote_data, operatorData=None, fetch_key=True, ssh_client=self.ssh_client, output=None)
+                # self.ssh_client.close()
+                # store_secure_item("temp_keys", None)
+                try:
+
+                    # this needs to remove temp_keys locally and remotely here and under deactivate
+                    del operatorData['myNodes'][operatorData['selected_node']]['meta']['temp_keys']
+                    write_operatorData(operatorData)
+                    from commands.utils import update_remote_data
+                    update_remote_data(updated_node_data=self.remote_data, remote_opData=None, remote_data=None, operatorData=operatorData, remote_password=None, ssh_client=self.ssh_client, output=None)
+                except:
+                    pass
                 self.ssh_client.close()
-            # store_secure_item("temp_keys", None)
-            try:
-                del operatorData['myNodes'][operatorData['selected_node']]['meta']['temp_keys']
-                write_operatorData(operatorData)
-            except:
-                pass
         elif self.option.lower() == 'update':
             operatorData = get_operatorData()
             operatorData['last_server_update'] = dt_to_string(now_utc())
@@ -7253,8 +7267,8 @@ class SetupScreen(BoxLayout):
             pass
         from commands.utils import get_or_create_node_obj
         full_nodeData, is_new = get_or_create_node_obj()
-        
-        if full_nodeData['nodeData']['node_level'].lower() == 'super':
+        self.full_nodeData = full_nodeData
+        if self.full_nodeData['nodeData']['node_level'].lower() == 'super':
             self.user_passphrase_prompt(next_cmd=self.run_deactivate_step2a)
         else:
             self.run_deactivate_step2a()
@@ -7278,6 +7292,10 @@ class SetupScreen(BoxLayout):
         else:
             self.host = 'remote'
             self.remote_data = get_remote(node_id=self.operatorData['selected_node'], operatorData=self.operatorData)
+
+        self.full_nodeData['meta']['temp_keys'] = self.temp_keys
+        self.operatorData['myNodes'][self.operatorData['selected_node']] = self.full_nodeData
+        write_operatorData(self.operatorData)
 
         self.context = {}
         if self.host == 'local':
@@ -7438,11 +7456,11 @@ class SetupScreen(BoxLayout):
                 full_nodeData['settings']['localhost'] = '127.0.0.1:' + port
             full_nodeData['settings']['port'] = port
             full_nodeData['settings']['isTesting'] = self.isTesting
-            self.operatorData['myNodes'][self.operatorData['selected_node']] = full_nodeData
             
             if self.isTesting:
                 self.enableTasker = False
         full_nodeData['meta']['temp_keys'] = self.temp_keys
+        self.operatorData['myNodes'][self.operatorData['selected_node']] = full_nodeData
         write_operatorData(self.operatorData)
 
         self.context = {}
