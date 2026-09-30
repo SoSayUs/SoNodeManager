@@ -452,6 +452,7 @@ def setup_llm(output=None, remote_cmd=False, systemPass=None):
 
     model_url = "https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-1M-GGUF/resolve/main/Qwen2.5-7B-Instruct-1M-Q5_K_M.gguf?download=true"
     model_url = "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/main/qwen2.5-coder-7b-instruct-q4_k_m.gguf?download=true"
+    model_url = "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/main/qwen2.5-coder-7b-instruct-q3_k_m.gguf?download=true"
     paths = run_setup(sudo_password=systemPass, model_url=model_url)
     add_llama_to_supervisor(sudo_password=systemPass, model_url=model_url)
     print(f"\nvenv python: {paths['python_bin']}")
@@ -467,7 +468,7 @@ def add_llama_to_supervisor(
     # model_filename="Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
     model_url=None,
     port=8081,
-    n_ctx=9000,
+    n_ctx=4096,
     strict_determinism=False,
     ):
     home = Path(f"/Users/{username}")
