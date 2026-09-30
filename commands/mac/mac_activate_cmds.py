@@ -486,13 +486,14 @@ def add_llama_to_supervisor(
     block = f"""
 [program:llama]
 command={cmd}
+priority=5
 autostart=true
 autorestart=true
 startsecs=10
 stopasgroup=true
 killasgroup=true
 redirect_stderr=true
-stdout_logfile={conf.parent}/llama.log
+stdout_logfile=/Users/{username}/Sonet/.data/logs/llama.log
 stdout_logfile_maxbytes=10MB
 stdout_logfile_backups=2
 """
@@ -522,6 +523,17 @@ def intelligence_check(output=None, remote_cmd=False):
         update_output('Setting up LLM...', output)
         setup_llm(output=output, remote_cmd=remote_cmd, systemPass=systemPass)
         update_output('Done setting up LLM', output)
+
+
+def run_supervisor_start(output=None, remote_cmd=False):
+    get_variables()
+    global operatorData
+    global systemPass
+    from .mac_install_cmds import activate_supervisor
+    activate_supervisor(username, uid, systemPass)
+    # activate_supervisor(username, uid, systemPass, write_plist=lambda: run_command('run_write_supervisor_plist'))
+    # then: run_command('intelligence_check')
+
 
 def declare_active(output=None, remote_cmd=False):
     from commands.utils import declare_self_active
@@ -560,6 +572,7 @@ special_commands = [
     {'cmd':'run_config_supervisor', 'reqs':'output_display'},
     {'cmd':'run_write_supervisor_plist', 'reqs':'output_display'},
     {'cmd':'activate_cloudflare_service', 'reqs':'output_display'},
+    {'cmd':'run_supervisor_start', 'reqs':'output_display'},
     {'cmd':'intelligence_check', 'reqs':'output_display'},
     {'cmd':'pause'},
     {'cmd':'declare_active', 'reqs':'output_display'},
@@ -597,22 +610,23 @@ action_cmds = [
     ["raise_if_error", "sudo", "-S", f"{homepath}/Sonet/.data/env/bin/python3", f"{homepath}/Sonet/SoNodeServer/manage.py", "collectstatic", "--noinput"],
     ['sudo', '-S', 'chown', '-R', f'{username}:staff', f'/Users/{username}/Sonet/.data/logs'],
     ['sudo', '-S', 'chown', '-R', f'{username}:staff', f'/Users/{username}/Sonet/.data/supervisor'],
-    ['/opt/homebrew/bin/supervisord', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf'],
-    ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'reread'],
-    ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'update'],
-    ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'start', 'gunicorn'],
-    ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'start', 'rqscheduler'],
-    ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'start', 'tor'],
-    ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'start', 'all'],
-    ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'restart', 'all'],
-    ['run_command', 'run_write_supervisor_plist'],
-    ['launchctl', 'bootout', f'gui/{uid}', f'/Users/{username}/Library/LaunchAgents/com.sonet.supervisor.plist'],
-    ['sudo', '-S', 'pkill', '-f', 'supervisord'],
-    ['/bin/rm', '-f', f'/Users/{username}/Sonet/.data/supervisor/supervisor.sock'],
-    ['/bin/rm', '-f', f'/Users/{username}/Sonet/.data/supervisor/supervisord.pid'],
-    ['/bin/sleep', '2'],
-    ['launchctl', 'bootstrap', f'gui/{uid}', f'/Users/{username}/Library/LaunchAgents/com.sonet.supervisor.plist'],
-    ['sudo', '-S', 'launchctl', 'bootstrap', 'system', '/Library/LaunchDaemons/homebrew.mxcl.postgresql.plist'],
+    # ['/opt/homebrew/bin/supervisord', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf'],
+    # ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'reread'],
+    # ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'update'],
+    # ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'start', 'gunicorn'],
+    # ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'start', 'rqscheduler'],
+    # ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'start', 'tor'],
+    # ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'start', 'all'],
+    # ['sudo', '-S', '/opt/homebrew/bin/supervisorctl', '-c', f'/Users/{username}/Sonet/.data/supervisor/supervisord.conf', 'restart', 'all'],
+    # ['run_command', 'run_write_supervisor_plist'],
+    # ['launchctl', 'bootout', f'gui/{uid}', f'/Users/{username}/Library/LaunchAgents/com.sonet.supervisor.plist'],
+    # ['sudo', '-S', 'pkill', '-f', 'supervisord'],
+    # ['/bin/rm', '-f', f'/Users/{username}/Sonet/.data/supervisor/supervisor.sock'],
+    # ['/bin/rm', '-f', f'/Users/{username}/Sonet/.data/supervisor/supervisord.pid'],
+    # ['/bin/sleep', '2'],
+    # ['launchctl', 'bootstrap', f'gui/{uid}', f'/Users/{username}/Library/LaunchAgents/com.sonet.supervisor.plist'],
+    # ['sudo', '-S', 'launchctl', 'bootstrap', 'system', '/Library/LaunchDaemons/homebrew.mxcl.postgresql.plist'],
+    ['run_command', 'run_supervisor_start'],
     ['run_command', 'intelligence_check'],
     ['run_command', 'pause'],
     ['echo', 'Finished!'],
