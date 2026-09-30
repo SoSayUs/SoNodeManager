@@ -451,6 +451,7 @@ def setup_llm(output=None, remote_cmd=False, systemPass=None):
     print('p1d')
 
     model_url = "https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-1M-GGUF/resolve/main/Qwen2.5-7B-Instruct-1M-Q5_K_M.gguf?download=true"
+    model_url = "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/main/qwen2.5-coder-7b-instruct-q4_k_m.gguf?download=true"
     paths = run_setup(sudo_password=systemPass, model_url=model_url)
     add_llama_to_supervisor(sudo_password=systemPass, model_url=model_url)
     print(f"\nvenv python: {paths['python_bin']}")
