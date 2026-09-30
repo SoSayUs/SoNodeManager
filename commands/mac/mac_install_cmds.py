@@ -3,6 +3,7 @@ import os
 import subprocess
 import getpass
 import requests
+import glob, time
 import re
 from os.path import expanduser
 from kivy.clock import Clock
@@ -357,7 +358,7 @@ def write_supervisor_plist(install=True, output=None, nodeData=None, remote_cmd=
                 <string>/opt/homebrew/bin/supervisord</string>
                 <string>-n</string>
                 <string>-c</string>
-                <string>/Users/sozed/Sonet/.data/supervisor/supervisord.conf</string>
+                <string>/Users/{username}/Sonet/.data/supervisor/supervisord.conf</string>
             </array>
             <key>RunAtLoad</key>
             <true/>
@@ -369,11 +370,13 @@ def write_supervisor_plist(install=True, output=None, nodeData=None, remote_cmd=
                 <true/>
             </dict>
             <key>WorkingDirectory</key>
-            <string>/Users/sozed/Sonet</string>
+            <string>/Users/{username}/Sonet</string>
             <key>StandardOutPath</key>
-            <string>/Users/sozed/Sonet/.data/logs/supervisor.log</string>
+            <string>/Users/{username}/Sonet/.data/logs/supervisor.log</string>
             <key>StandardErrorPath</key>
-            <string>/Users/sozed/Sonet/.data/logs/supervisor.err</string>
+            <string>/Users/{username}/Sonet/.data/logs/supervisor.err</string>
+            <key>ExitTimeOut</key>
+            <integer>90</integer>
         </dict>
         </plist>'''
     ]
@@ -386,16 +389,25 @@ def write_supervisor_plist(install=True, output=None, nodeData=None, remote_cmd=
 def config_supervisor(install=True, output=None, nodeData=None, remote_cmd=False):
     print('-config_supervisor')
     text = [
-        '''[supervisord]\n''',
-        "nodaemon=false\n",
-        f'''logfile=/Users/{username}/Sonet/.data/logs/supervisord.log\n''',
-        f'''pidfile=/Users/{username}/Sonet/.data/supervisor/supervisord.pid\n''',
-        f'''childlogdir=/Users/{username}/Sonet/.data/logs\n''',
-        f'''stdout_logfile=/Users/{username}/Sonet/.data/logs/supervisord.log\n''',
-        f'''stderr_logfile=/Users/{username}/Sonet/.data/logs/supervisord_err.log\n''',
-        "stdout_logfile_maxbytes=10MB\n",
-        "stdout_logfile_backups=2\n",
-        f'''user={username}\n''',
+        '[supervisord]\n',
+        'nodaemon=true\n',
+        f'logfile=/Users/{username}/Sonet/.data/logs/supervisord.log\n',
+        'logfile_maxbytes=10MB\n',
+        'logfile_backups=2\n',
+        f'pidfile=/Users/{username}/Sonet/.data/supervisor/supervisord.pid\n',
+        f'childlogdir=/Users/{username}/Sonet/.data/logs\n',
+        f'user={username}\n',
+
+        # '''[supervisord]\n''',
+        # "nodaemon=false\n",
+        # f'''logfile=/Users/{username}/Sonet/.data/logs/supervisord.log\n''',
+        # f'''pidfile=/Users/{username}/Sonet/.data/supervisor/supervisord.pid\n''',
+        # f'''childlogdir=/Users/{username}/Sonet/.data/logs\n''',
+        # f'''stdout_logfile=/Users/{username}/Sonet/.data/logs/supervisord.log\n''',
+        # f'''stderr_logfile=/Users/{username}/Sonet/.data/logs/supervisord_err.log\n''',
+        # "stdout_logfile_maxbytes=10MB\n",
+        # "stdout_logfile_backups=2\n",
+        # f'''user={username}\n''',
 
         '''\n[unix_http_server]\n''',
         f'''file=/Users/{username}/Sonet/.data/supervisor/supervisor.sock\n''',
@@ -867,7 +879,76 @@ def link_postgres(install=True, output=None, remote_cmd=False):
     else:
         # print(f"\nLinking failed (exit code {code}).")
         update_output(f"\nLinking failed (exit code {code})", output)
-        
+
+
+def activate_supervisor(write_plist=None):
+    get_variables()
+    global operatorData
+    global node_data
+    global systemPass
+    home  = f"/Users/{username}"
+    sdir  = f"{home}/Sonet/.data/supervisor"
+    conf  = f"{sdir}/supervisord.conf"
+    plist = f"{home}/Library/LaunchAgents/com.sonet.supervisor.plist"
+    ctl   = ["/opt/homebrew/bin/supervisorctl", "-c", conf]
+
+    def run(cmd, **kw):
+        return subprocess.run(cmd, capture_output=True, text=True, **kw)
+
+    def wait(cond, secs):
+        for _ in range(secs):
+            if cond():
+                return True
+            time.sleep(1)
+        return False
+
+    def daemon_alive():
+        return run(["pgrep", "-f", "bin/supervisord"]).returncode == 0
+
+    # 1. Postgres (root LaunchDaemon). Already loaded -> harmless error, ignored.
+    if systemPass:
+        run(["sudo", "-S", "launchctl", "bootstrap", "system",
+             "/Library/LaunchDaemons/homebrew.mxcl.postgresql.plist"],
+            input=systemPass + "\n")
+
+    # 2. Regenerate the LaunchAgent plist (your run_write_supervisor_plist)
+    if write_plist:
+        write_plist()
+
+    # 3. Stop the old daemon cleanly and WAIT for it to exit
+    # run(["launchctl", "bootout", f"gui/{uid}", plist])
+    # if daemon_alive():
+    #     run(ctl + ["shutdown"])              # graceful, stops children
+    #     if not wait(lambda: not daemon_alive(), 60):
+    #         run(["pkill", "-9", "-f", "bin/supervisord"])
+    #         wait(lambda: not daemon_alive(), 5)
+    run(["launchctl", "bootout", f"gui/{uid}", plist])
+    if not wait(lambda: not daemon_alive(), 90):
+        run(["pkill", "-9", "-f", "bin/supervisord"])
+        wait(lambda: not daemon_alive(), 5)
+
+    # 4. Remove stale files (only safe now that nothing is running)
+    for f in glob.glob(f"{sdir}/supervisor.sock*") + [f"{sdir}/supervisord.pid"]:
+        try:
+            os.remove(f)
+        except FileNotFoundError:
+            pass
+
+    # 5. Start the daemon via the LaunchAgent (user GUI session -> Metal works)
+    r = run(["launchctl", "bootstrap", f"gui/{uid}", plist])
+    if r.returncode != 0:
+        raise RuntimeError(f"bootstrap failed: {r.stderr}")
+    if not wait(lambda: run(ctl + ["version"]).returncode == 0, 30):
+        raise RuntimeError("supervisord not reachable after bootstrap")
+
+    # 6. Load config and start everything (idempotent on a fresh daemon)
+    run(ctl + ["reread"])
+    run(ctl + ["update"])
+    run(ctl + ["start", "all"])              # blocks until each passes startsecs
+
+    status = run(ctl + ["status"]).stdout
+    print(status)
+    return status   
 
 
 # in the event the mac upgrades postgres without constent
