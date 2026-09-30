@@ -526,11 +526,11 @@ def intelligence_check(output=None, remote_cmd=False):
 
 
 def run_supervisor_start(output=None, remote_cmd=False):
-    get_variables()
-    global operatorData
-    global systemPass
+    # get_variables()
+    # global operatorData
+    # global systemPass
     from .mac_install_cmds import activate_supervisor
-    activate_supervisor(username, uid, systemPass)
+    activate_supervisor()
     # activate_supervisor(username, uid, systemPass, write_plist=lambda: run_command('run_write_supervisor_plist'))
     # then: run_command('intelligence_check')
 
