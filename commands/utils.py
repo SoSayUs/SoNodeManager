@@ -2339,6 +2339,7 @@ def get_commands(task, system=None, operatorData=None, in_full=False, extras={})
                 ['sudo', '-S', 'pkill', '-f', 'supervisord'],
                 ['sudo', '-S', 'pkill', '-f', 'rqworker'],
                 ['sudo', '-S', 'pkill', '-f', 'gunicorn'],
+                ['sudo', '-S', "pkill", "-f", "llama_cpp.server"],
                 ['/bin/sleep', '2'],  # give them time to die
                 ['sudo', '-S', 'rm', '-f', f'/Users/{username}/Sonet/.data/supervisor/supervisor.sock'],
                 ['sudo', '-S', 'chown', '-R', f'{username}:staff', f'/Users/{username}/Sonet/.data/logs'],
